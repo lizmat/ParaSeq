@@ -1,0 +1,29 @@
+{
+  "auth": "zef:lizmat",
+  "authors": [
+    "Elizabeth Mattijsen"
+  ],
+  "build-depends": [
+  ],
+  "depends": [
+  ],
+  "description": "Parallel execution of Iterables",
+  "license": "Artistic-2.0",
+  "name": "ParaSeq",
+  "perl": "6.d",
+  "provides": {
+    "ParaSeq": "lib/ParaSeq.rakumod"
+  },
+  "resources": [
+  ],
+  "source-url": "https://github.com/lizmat/ParaSeq.git",
+  "tags": [
+    "HYPER",
+    "RACE",
+    "PARALLEL",
+    "NAUGHTY"
+  ],
+  "test-depends": [
+  ],
+  "version": "0.0.1"
+}

@@ -1,0 +1,6 @@
+use Test;
+use ParaSeq;
+
+pass "replace me";
+
+done-testing;
