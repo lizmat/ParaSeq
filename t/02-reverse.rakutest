@@ -3,12 +3,13 @@ use ParaSeq;
 
 plan 4;
 
-my constant @list = ^200000;
+my constant @list = (^200000).List;
 my constant @tsil = @list.reverse;
 
-is-deeply @list.&hyperize(2000, 1).reverse.List, @tsil,
-  'reverse with degree = 1';
-is-deeply @list.&hyperize(2000).reverse.List,    @tsil,
-  'reverse with degree = N';
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize(2000, $_).reverse;
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @tsil, "reverse with degree = $_";
+}
 
 # vim: expandtab shiftwidth=4

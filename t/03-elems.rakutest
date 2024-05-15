@@ -3,12 +3,16 @@ use ParaSeq;
 
 plan 6;
 
-my constant @list = ^200000;
-is-deeply @list.&hyperize(2000, 1).elems, 200000 , '.elems with degree 1';
-is-deeply @list.&hyperize(2000   ).elems, 200000 , '.elems with degree N';
+my constant @list  = (^200000).List;
+my constant $elems = @list.elems;
+my constant $end   = @list.end;
 
-is-deeply @list.&hyperize(2000, 1).end,   199999 , '.end with degree 1';
-is-deeply @list.&hyperize(2000   ).end,   199999 , '.end with degree N';
+for 1, ParaSeq.default-degree {
+    is-deeply @list.&hyperize(2000, $_).elems, $elems ,
+      ".elems with degree $_";
+    is-deeply @list.&hyperize(2000, $_).end,   $end ,
+      ".end with degree $_";
+}
 
 fails-like { (^Inf).&hyperize.elems }, X::Cannot::Lazy,
   action => '.elems';

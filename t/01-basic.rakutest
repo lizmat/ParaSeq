@@ -1,11 +1,28 @@
 use Test;
 use ParaSeq;
 
-plan 3;
-
-dies-ok { "ParaSeq".EVAL }, 'ParaSeq is *not* exported';
+plan 16;
 
 ok &hyperize, 'was hyperize exported';
 ok &racify,   'was racify exported';
+
+my constant @list = (^200000).List;
+isa-ok @list.&hyperize, ParaSeq, 'did hyperize produce a ParaSeq';
+isa-ok @list.&racify,   ParaSeq, 'did racify produce a ParaSeq';
+
+for 1, ParaSeq.default-degree {
+    is-deeply @list.&hyperize(2000, $_).Array, [@list],
+      "did .Array produce ok with degree $_";
+    is-deeply @list.&hyperize(2000, $_).Hash, @list.Hash,
+      "did .Hash produce ok with degree $_";
+    is-deeply @list.&hyperize(2000, $_).List, @list,
+      "did .List produce ok with degree $_";
+    is-deeply @list.&hyperize(2000, $_).Map, @list.Map,
+      "did .Map produce ok with degree $_";
+    is-deeply @list.&hyperize(2000, $_).Seq, @list.Seq,
+      "did .Seq produce ok with degree $_";
+    is-deeply @list.&hyperize(2000, $_).Slip, @list.Slip,
+      "did .Slip produce ok with degree $_";
+}
 
 # vim: expandtab shiftwidth=4

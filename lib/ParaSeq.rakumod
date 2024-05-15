@@ -7,7 +7,7 @@ my int $default-degree = Kernel.cpu-cores-but-one;
 
 #- ParaSeq ---------------------------------------------------------------------
 
-my class ParaSeq {
+class ParaSeq {
     has      $!source;
     has int  $.batch;
     has int  $.degree;
@@ -47,6 +47,11 @@ my class ParaSeq {
 
     method iterator() { $!source }  # for now
 
+#- introspection ---------------------------------------------------------------
+
+    method default-batch()  { $default-batch  }
+    method default-degree() { $default-degree }
+
 #- standard Iterable interfaces ------------------------------------------------
 
     multi method map(ParaSeq:D: &mapper) {
@@ -76,10 +81,16 @@ my class ParaSeq {
         self!from-iterable: self.Seq.skip(|c)
     }
 
+    multi method head(ParaSeq:D:) {
+        self.Seq.head
+    }
     multi method head(ParaSeq:D: |c) {
         self!from-iterable: self.Seq.head(|c)
     }
 
+    multi method tail(ParaSeq:D:) {
+        self.Seq.tail
+    }
     multi method tail(ParaSeq:D: |c) {
         self!from-iterable: self.Seq.tail(|c)
     }
@@ -132,7 +143,8 @@ multi sub hyperize(\iterable, Int:D $batch, Int:D $degree) {
 }
 
 # For now, there doesn't seem to be too much to be gained by supporting
-# an alternate path where the order of the results is *not* preserved
+# an alternate path where the order of the results is *not* preserved,
+# so just equate "racify" with "hyperize" for now
 my constant &racify is export = &hyperize;
 
 =begin pod
