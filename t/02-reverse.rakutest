@@ -1,0 +1,14 @@
+use Test;
+use ParaSeq;
+
+plan 4;
+
+my constant @list = ^200000;
+my constant @tsil = @list.reverse;
+
+is-deeply @list.&hyperize(2000, 1).reverse.List, @tsil,
+  'reverse with degree = 1';
+is-deeply @list.&hyperize(2000).reverse.List,    @tsil,
+  'reverse with degree = N';
+
+# vim: expandtab shiftwidth=4

@@ -1,0 +1,18 @@
+use Test;
+use ParaSeq;
+
+plan 6;
+
+my constant @list = ^200000;
+is-deeply @list.&hyperize(2000, 1).elems, 200000 , '.elems with degree 1';
+is-deeply @list.&hyperize(2000   ).elems, 200000 , '.elems with degree N';
+
+is-deeply @list.&hyperize(2000, 1).end,   199999 , '.end with degree 1';
+is-deeply @list.&hyperize(2000   ).end,   199999 , '.end with degree N';
+
+fails-like { (^Inf).&hyperize.elems }, X::Cannot::Lazy,
+  action => '.elems';
+fails-like { (^Inf).&hyperize.end   }, X::Cannot::Lazy,
+  action => '.end';
+
+# vim: expandtab shiftwidth=4

@@ -1,6 +1,11 @@
 use Test;
 use ParaSeq;
 
-pass "replace me";
+plan 3;
 
-done-testing;
+dies-ok { "ParaSeq".EVAL }, 'ParaSeq is *not* exported';
+
+ok &hyperize, 'was hyperize exported';
+ok &racify,   'was racify exported';
+
+# vim: expandtab shiftwidth=4
