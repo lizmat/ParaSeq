@@ -54,33 +54,40 @@ class ParaSeq {
 
 #- standard Iterable interfaces ------------------------------------------------
 
+    proto method map(|) {*}
     multi method map(ParaSeq:D: &mapper) {
         self!from-iterable: self.Seq.map(&mapper, |%_)
     }
 
+    proto method grep(|) {*}
     multi method grep(ParaSeq:D: &mapper) {
         self!from-iterable: self.Seq.grep( &mapper, |%_)
     }
 
+    proto method first(|) {*}
+    multi method first(ParaSeq:D:) {
+        self.Seq.first
+    }
     multi method first(ParaSeq:D: &mapper) {
-        self!from-iterable: self.Seq.first(&mapper, |%_)
+        self.Seq.first(&mapper, |%_)
     }
     multi method first(ParaSeq:D: &mapper, :$end!) {
         $end
-          ?? self!from-iterable(
-               self.IterationBuffer.List.first(&mapper, :$end, |%_)
-             )
+          ?? self.IterationBuffer.List.first(&mapper, :$end, |%_)
           !! self.first(&mapper, |%_)
     }
 
+    proto method invert(|) {*}
     multi method invert(ParaSeq:D:) {
         self!from-iterable: self.Seq.invert
     }
 
+    proto method skip(|) {*}
     multi method skip(ParaSeq:D: |c) {
         self!from-iterable: self.Seq.skip(|c)
     }
 
+    proto method head(|) {*}
     multi method head(ParaSeq:D:) {
         self.Seq.head
     }
@@ -88,6 +95,7 @@ class ParaSeq {
         self!from-iterable: self.Seq.head(|c)
     }
 
+    proto method tail(|) {*}
     multi method tail(ParaSeq:D:) {
         self.Seq.tail
     }
@@ -95,18 +103,21 @@ class ParaSeq {
         self!from-iterable: self.Seq.tail(|c)
     }
 
+    proto method reverse(|) {*}
     multi method reverse(ParaSeq:D:) {
         self!from-iterator:
           Rakudo::Iterator.ReifiedReverse:
             self.IterationBuffer, Mu
     }
 
+    proto method elems(|) {*}
     multi method elems(ParaSeq:D:) {
         $!source.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.elems',"")
           !! nqp::elems(self.IterationBuffer)
     }
 
+    proto method end(|) {*}
     multi method end(ParaSeq:D:) {
         $!source.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.end',"")

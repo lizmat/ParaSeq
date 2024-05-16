@@ -1,0 +1,28 @@
+use Test;
+use ParaSeq;
+
+plan 12;
+
+my constant @list   = (^200000).reverse.List;
+my constant $map2   = @list.map(* %% 2).List;
+my constant $mapm2  = @list.map(-> $a, $b          { $a }).List;
+my constant $mapm4  = @list.map(-> $a, $b, $c, $d  { $a }).List;
+
+
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize(2000, $_).map(* %% 2);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $map2, "map(* %% 2) with degree = $_";
+
+    $seq := @list.&hyperize(2000, $_).map(-> $a, $b { $a });
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $mapm2,
+      "map(-> \$a, \$b \{ \$a }) with degree = $_";
+
+    $seq := @list.&hyperize(2000, $_).map(-> $a, $b, $c, $d { $a });
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $mapm4,
+      "map(-> \$a, \$b, \$c, \$d \{ \$a }) with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4
