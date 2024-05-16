@@ -29,6 +29,12 @@ my role ParaIterator does Iterator {
 
     method nr-queues()       { nqp::elems($!queues)      }
     method add-queue(\queue) { nqp::push($!queues,queue) }
+}
+
+#- ParaIteratorValue -----------------------------------------------------------
+# Basic ParaIterator instance producing values
+
+my class ParaIteratorValue does ParaIterator {
 
     method pull-one() {
         my $pulled := nqp::shift($!current);
@@ -43,6 +49,24 @@ my role ParaIterator does Iterator {
         );
 
         $pulled
+    }
+
+    method push-all($target) {
+        nqp::while(
+          1,
+          nqp::stmts(
+            (my $pulled := nqp::shift($!current)),
+            nqp::while(
+              nqp::eqaddr($pulled,IterationEnd),
+              nqp::if(
+                nqp::elems($!queues),
+                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
+                (return IterationEnd)
+              )
+            ),
+            nqp::push($target, $pulled)
+          )
+        );
     }
 }
 
@@ -67,6 +91,24 @@ my class ParaIteratorIndex does ParaIterator {
 
         $!index++
     }
+
+    method push-all($target) {
+        nqp::while(
+          1,
+          nqp::stmts(
+            (my $pulled := nqp::shift($!current)),
+            nqp::while(
+              nqp::eqaddr($pulled,IterationEnd),
+              nqp::if(
+                nqp::elems($!queues),
+                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
+                (return IterationEnd)
+              )
+            ),
+            nqp::push($target, $!index++)
+          )
+        );
+    }
 }
 
 #- ParaIteratorPair ------------------------------------------------------------
@@ -89,6 +131,24 @@ my class ParaIteratorPair does ParaIterator {
         );
 
         Pair.new($!index++, $pulled)
+    }
+
+    method push-all($target) {
+        nqp::while(
+          1,
+          nqp::stmts(
+            (my $pulled := nqp::shift($!current)),
+            nqp::while(
+              nqp::eqaddr($pulled,IterationEnd),
+              nqp::if(
+                nqp::elems($!queues),
+                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
+                (return IterationEnd)
+              )
+            ),
+            nqp::push($target,Pair.new($!index++, $pulled))
+          )
+        );
     }
 }
 
@@ -131,6 +191,25 @@ my class ParaIteratorIndexValue does ParaIterator {
             $pulled
         }
     }
+
+    method push-all($target) {
+        nqp::while(
+          1,
+          nqp::stmts(
+            (my $pulled := nqp::shift($!current)),
+            nqp::while(
+              nqp::eqaddr($pulled,IterationEnd),
+              nqp::if(
+                nqp::elems($!queues),
+                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
+                (return IterationEnd)
+              )
+            ),
+            nqp::push($target,$!index++),
+            nqp::push($target,$pulled)
+          )
+        );
+    }
 }
 
 #- ParaSeq ---------------------------------------------------------------------
@@ -147,11 +226,13 @@ class ParaSeq {
     # Entry point in chain, from an Iterable
     method !from-iterable($source) {
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!initial',
-          nqp::getattr_i(self, ParaSeq, '$!initial')
-        );
         nqp::bindattr_i($self, ParaSeq, '$!degree',
           nqp::getattr_i(self, ParaSeq, '$!degree')
+        );
+        nqp::bindattr_i($self, ParaSeq, '$!batch',
+          nqp::bindattr_i($self, ParaSeq, '$!initial',
+            nqp::getattr_i(self, ParaSeq, '$!initial')
+          )
         );
         nqp::p6bindattrinvres($self, ParaSeq, '$!source', $source.iterator)
     }
@@ -159,11 +240,13 @@ class ParaSeq {
     # Entry point in chain, from an Iterator
     method !from-iterator(\source) {
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!initial',
-          nqp::getattr_i(self, ParaSeq, '$!initial')
-        );
         nqp::bindattr_i($self, ParaSeq, '$!degree',
           nqp::getattr_i(self, ParaSeq, '$!degree')
+        );
+        nqp::bindattr_i($self, ParaSeq, '$!batch',
+          nqp::bindattr_i($self, ParaSeq, '$!initial',
+            nqp::getattr_i(self, ParaSeq, '$!initial')
+          )
         );
         nqp::p6bindattrinvres($self, ParaSeq, '$!source', source)
     }
@@ -176,17 +259,19 @@ class ParaSeq {
 #- entry points ----------------------------------------------------------------
 
     # Entry point from the subs
-    method parent($source, int $batch, int $degree, str $method) {
+    method parent($source, int $initial, int $degree, str $method) {
 
         # sanity check
         X::Invalid::Value.new(:$method, :name<batch>,  :value($!batch)).throw
-          if $batch <= 0;
+          if $initial <= 0;
         X::Invalid::Value.new(:$method, :name<degree>, :value($!degree)).throw
           if $degree <= 1;
 
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!initial', $batch );
         nqp::bindattr_i($self, ParaSeq, '$!degree',  $degree);
+        nqp::bindattr_i($self, ParaSeq, '$!batch',
+          nqp::bindattr_i($self, ParaSeq, '$!initial', $initial)
+        );
         nqp::p6bindattrinvres($self, ParaSeq, '$!source', $source.iterator)
     }
 
@@ -210,29 +295,49 @@ class ParaSeq {
 
     proto method map(|) {*}
     multi method map(ParaSeq:D: Callable:D $mapper) {
-        my $buffer := nqp::create(IterationBuffer);
-        return self!from-iterable($buffer.List.map($mapper))
-          if self!batch($buffer);
+#        my $buffer := nqp::create(IterationBuffer);
+#        return self!from-iterable($buffer.List.map($mapper))
+#          if self!batch($buffer);
 
         self!from-iterable: self.Seq.map($mapper)
     }
 
     proto method grep(|) {*}
     multi method grep(ParaSeq:D: Callable:D $matcher) {
+#        my $buffer := nqp::create(IterationBuffer);
+#        return self!from-iterable($buffer.List.grep($matcher, |%_))
+#          if self!batch($buffer);
+
         self!from-iterable: self.Seq.grep($matcher, |%_)
     }
     multi method grep(ParaSeq:D: $matcher) {
+#        my $buffer := nqp::create(IterationBuffer);
+#        return self!from-iterable($buffer.List.grep($matcher, |%_))
+#          if self!batch($buffer);
+
         self!from-iterable: self.Seq.grep($matcher, |%_)
     }
 
     proto method first(|) {*}
     multi method first(ParaSeq:D: Callable:D $matcher) {
+#        my $buffer := nqp::create(IterationBuffer);
+#        return self!from-iterable($buffer.List.first($matcher, |%_))
+#          if self!batch($buffer);
+
         self.Seq.first($matcher, |%_)
     }
     multi method first(ParaSeq:D: $matcher) {
+#        my $buffer := nqp::create(IterationBuffer);
+#        return self!from-iterable($buffer.List.first($matcher, |%_))
+#          if self!batch($buffer);
+
         self.Seq.first($matcher, |%_)
     }
     multi method first(ParaSeq:D: $matcher, :$end!) {
+#        my $buffer := nqp::create(IterationBuffer);
+#        return self!from-iterable($buffer.List.first($matcher, |%_))
+#          if self!batch($buffer);
+
         $end
           ?? self.IterationBuffer.List.first($matcher, :end, |%_)
           !! self.first($matcher, |%_)
