@@ -16,7 +16,7 @@ my class ParaQueue is repr('ConcBlockingQueue') { }
 # queue of queues is also a ParaQueue so that queues can also be added
 # and removed in a thread-safe manner
 
-my role ParaIterator does Iterator {
+my class ParaIterator does Iterator {
     has $!current;
     has $!queues;
 
@@ -29,12 +29,6 @@ my role ParaIterator does Iterator {
 
     method nr-queues()       { nqp::elems($!queues)      }
     method add-queue(\queue) { nqp::push($!queues,queue) }
-}
-
-#- ParaIteratorValue -----------------------------------------------------------
-# Basic ParaIterator instance producing values
-
-my class ParaIteratorValue does ParaIterator {
 
     method pull-one() {
         my $pulled := nqp::shift($!current);
@@ -42,9 +36,9 @@ my class ParaIteratorValue does ParaIterator {
         nqp::while(
           nqp::eqaddr($pulled,IterationEnd),
           nqp::if(
-            nqp::elems($!queues),
-            ($pulled := nqp::shift($!current := nqp::shift($!queues))),
-            (return IterationEnd)
+            nqp::eqaddr(($pulled := nqp::shift($!queues)),IterationEnd),
+            (return IterationEnd),  # really done
+            ($!current := $pulled)  # set next queue
           )
         );
 
@@ -59,154 +53,12 @@ my class ParaIteratorValue does ParaIterator {
             nqp::while(
               nqp::eqaddr($pulled,IterationEnd),
               nqp::if(
-                nqp::elems($!queues),
-                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
-                (return IterationEnd)
+                nqp::eqaddr(($pulled := nqp::shift($!queues)),IterationEnd),
+                (return IterationEnd),  # really done
+                ($!current := $pulled)  # set next queue
               )
             ),
             nqp::push($target, $pulled)
-          )
-        );
-    }
-}
-
-#- ParaIteratorIndex -----------------------------------------------------------
-# Same as ParaIterator, but produces index values of the produced values,
-# instead of the actual values.
-
-my class ParaIteratorIndex does ParaIterator {
-    has int $!index;
-
-    method pull-one() {
-        my $pulled := nqp::shift($!current);
-
-        nqp::while(
-          nqp::eqaddr($pulled,IterationEnd),
-          nqp::if(
-            nqp::elems($!queues),
-            ($pulled := nqp::shift($!current := nqp::shift($!queues))),
-            (return IterationEnd)
-          )
-        );
-
-        $!index++
-    }
-
-    method push-all($target) {
-        nqp::while(
-          1,
-          nqp::stmts(
-            (my $pulled := nqp::shift($!current)),
-            nqp::while(
-              nqp::eqaddr($pulled,IterationEnd),
-              nqp::if(
-                nqp::elems($!queues),
-                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
-                (return IterationEnd)
-              )
-            ),
-            nqp::push($target, $!index++)
-          )
-        );
-    }
-}
-
-#- ParaIteratorPair ------------------------------------------------------------
-# Same as ParaIterator, but produces a Pair of the index and the produced
-# value
-
-my class ParaIteratorPair does ParaIterator {
-    has int $!index;
-
-    method pull-one() {
-        my $pulled := nqp::shift($!current);
-
-        nqp::while(
-          nqp::eqaddr($pulled,IterationEnd),
-          nqp::if(
-            nqp::elems($!queues),
-            ($pulled := nqp::shift($!current := nqp::shift($!queues))),
-            (return IterationEnd)
-          )
-        );
-
-        Pair.new($!index++, $pulled)
-    }
-
-    method push-all($target) {
-        nqp::while(
-          1,
-          nqp::stmts(
-            (my $pulled := nqp::shift($!current)),
-            nqp::while(
-              nqp::eqaddr($pulled,IterationEnd),
-              nqp::if(
-                nqp::elems($!queues),
-                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
-                (return IterationEnd)
-              )
-            ),
-            nqp::push($target,Pair.new($!index++, $pulled))
-          )
-        );
-    }
-}
-
-#- ParaIteratorIndexValue ------------------------------------------------------
-# Same as ParaIterator, but produces an index and produced value alternately
-
-my class ParaIteratorIndexValue does ParaIterator {
-    has int $!index;
-    has     $!pulled;
-
-    my constant NEXT = nqp::create(Mu);
-
-    method new(\current) {
-        my $self := nqp::create(self);
-        nqp::bindattr($self,ParaIterator,'$!current',current);
-        nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
-        nqp::bindattr($self,ParaIteratorIndexValue,'$!pulled',NEXT);
-        $self
-    }
-
-    method pull-one() {
-        if nqp::eqaddr($!pulled,NEXT) {
-            my $pulled := nqp::shift($!current);
-
-            nqp::while(
-              nqp::eqaddr($pulled,IterationEnd),
-              nqp::if(
-                nqp::elems($!queues),
-                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
-                (return IterationEnd)
-              )
-            );
-
-            nqp::bindattr(self,ParaIteratorIndexValue,'$!pulled',$pulled);
-            $!index++;
-        }
-        else {
-            my $pulled := $!pulled;
-            nqp::bindattr(self,ParaIteratorIndexValue,'$!pulled',NEXT);
-            $pulled
-        }
-    }
-
-    method push-all($target) {
-        nqp::while(
-          1,
-          nqp::stmts(
-            (my $pulled := nqp::shift($!current)),
-            nqp::while(
-              nqp::eqaddr($pulled,IterationEnd),
-              nqp::if(
-                nqp::elems($!queues),
-                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
-                (return IterationEnd)
-              )
-            ),
-            nqp::push($target,$!index++),
-            nqp::push($target,$pulled)
           )
         );
     }
