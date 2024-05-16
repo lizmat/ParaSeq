@@ -1,0 +1,15 @@
+use Test;
+use ParaSeq;
+
+plan 4;
+
+my constant @list = (^200000).reverse.pairs.List;
+my constant @tsil = @list.invert;
+
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize(2000, $_).invert;
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @tsil, "invert with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4
