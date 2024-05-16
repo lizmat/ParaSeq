@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 16;
+plan 18;
 
 ok &hyperize, 'was hyperize exported';
 ok &racify,   'was racify exported';
@@ -23,6 +23,9 @@ for 1, ParaSeq.default-degree {
       "did .Seq produce ok with degree $_";
     is-deeply @list.&hyperize(2000, $_).Slip, @list.Slip,
       "did .Slip produce ok with degree $_";
+
+    is-deeply @list.&hyperize(2000, $_).serial, @list.serial,
+      "did .serial produce ok with degree $_";
 }
 
 # vim: expandtab shiftwidth=4

@@ -1,22 +1,25 @@
 use Test;
 use ParaSeq;
 
-plan 6;
+plan 9;
 
 my constant @list  = (^200000).List;
 my constant $elems = @list.elems;
 my constant $end   = @list.end;
 
 for 1, ParaSeq.default-degree {
-    is-deeply @list.&hyperize(2000, $_).elems, $elems ,
+    is-deeply @list.&hyperize(2000, $_).elems, $elems,
       ".elems with degree $_";
-    is-deeply @list.&hyperize(2000, $_).end,   $end ,
+    is-deeply @list.&hyperize(2000, $_).end,   $end,
       ".end with degree $_";
+    is-deeply @list.&hyperize(2000, $_).is-lazy, False,
+      ".is-lazy with degree $_";
 }
 
 fails-like { (^Inf).&hyperize.elems }, X::Cannot::Lazy,
   action => '.elems';
 fails-like { (^Inf).&hyperize.end   }, X::Cannot::Lazy,
   action => '.end';
+is-deeply (^Inf).&hyperize.is-lazy, True, '^Inf is lazy';
 
 # vim: expandtab shiftwidth=4

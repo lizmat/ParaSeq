@@ -42,6 +42,15 @@ Alternately, if the initial batch size is large enough to exhaust the source, it
 
 Note that the default initial batch size is **10**, rather than **64** in the current implementation of `.hyper` and `.race`, making the chance smaller that parallelization is abandoned too soon.
 
+Infectiousness
+--------------
+
+The `.serial` method or `.Seq` coercer can be typically be used to "unhyper" a hypered sequence. However many other interface methods do the same in the current implementation of `.hyper` and `.race`, thereby giving the impression that the flow is still parallelized. When in fact they aren't anymore.
+
+Also, hyperized sequences in the current implementation are considered to be non-lazy, even if the source **is** lazy.
+
+This implementation aims to make all interface methods pass on the hypered nature and laziness of the sequence.
+
 Loop control statements
 -----------------------
 

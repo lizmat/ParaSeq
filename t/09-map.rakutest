@@ -8,7 +8,6 @@ my constant $map2   = @list.map(* %% 2).List;
 my constant $mapm2  = @list.map(-> $a, $b          { $a }).List;
 my constant $mapm4  = @list.map(-> $a, $b, $c, $d  { $a }).List;
 
-
 for 1, ParaSeq.default-degree {
     my $seq := @list.&hyperize(2000, $_).map(* %% 2);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;

@@ -1,24 +1,154 @@
-# Intended to be as fast as possible and to be someday become
-# part of the Rakudo core
+# Intended to be as fast as possible and to someday become part of the
+# Rakudo core
 use nqp;
 
 my int $default-batch  = 10;
 my int $default-degree = Kernel.cpu-cores-but-one;
 
-#- ParaSeq ---------------------------------------------------------------------
+#- ParaQueue -------------------------------------------------------------------
+# A blocking concurrent queue to which one can nqp::push and from which one
+# can nqp::shift
+my class ParaQueue is repr('ConcBlockingQueue') { }
 
+#- ParaIterator ----------------------------------------------------------------
+# An iterator that takes a number of ParaQueues and produces all values
+# from them until the last ParaQueue has been exhausted.  Note that the
+# queue of queues is also a ParaQueue so that queues can also be added
+# and removed in a thread-safe manner
+
+my role ParaIterator does Iterator {
+    has $!current;
+    has $!queues;
+
+    method new(\current) {
+        my $self := nqp::create(self);
+        nqp::bindattr($self,ParaIterator,'$!current',current);
+        nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
+        $self
+    }
+
+    method nr-queues()       { nqp::elems($!queues)      }
+    method add-queue(\queue) { nqp::push($!queues,queue) }
+
+    method pull-one() {
+        my $pulled := nqp::shift($!current);
+
+        nqp::while(
+          nqp::eqaddr($pulled,IterationEnd),
+          nqp::if(
+            nqp::elems($!queues),
+            ($pulled := nqp::shift($!current := nqp::shift($!queues))),
+            (return IterationEnd)
+          )
+        );
+
+        $pulled
+    }
+}
+
+#- ParaIteratorIndex -----------------------------------------------------------
+# Same as ParaIterator, but produces index values of the produced values,
+# instead of the actual values.
+
+my class ParaIteratorIndex does ParaIterator {
+    has int $!index;
+
+    method pull-one() {
+        my $pulled := nqp::shift($!current);
+
+        nqp::while(
+          nqp::eqaddr($pulled,IterationEnd),
+          nqp::if(
+            nqp::elems($!queues),
+            ($pulled := nqp::shift($!current := nqp::shift($!queues))),
+            (return IterationEnd)
+          )
+        );
+
+        $!index++
+    }
+}
+
+#- ParaIteratorPair ------------------------------------------------------------
+# Same as ParaIterator, but produces a Pair of the index and the produced
+# value
+
+my class ParaIteratorPair does ParaIterator {
+    has int $!index;
+
+    method pull-one() {
+        my $pulled := nqp::shift($!current);
+
+        nqp::while(
+          nqp::eqaddr($pulled,IterationEnd),
+          nqp::if(
+            nqp::elems($!queues),
+            ($pulled := nqp::shift($!current := nqp::shift($!queues))),
+            (return IterationEnd)
+          )
+        );
+
+        Pair.new($!index++, $pulled)
+    }
+}
+
+#- ParaIteratorIndexValue ------------------------------------------------------
+# Same as ParaIterator, but produces an index and produced value alternately
+
+my class ParaIteratorIndexValue does ParaIterator {
+    has int $!index;
+    has     $!pulled;
+
+    my constant NEXT = nqp::create(Mu);
+
+    method new(\current) {
+        my $self := nqp::create(self);
+        nqp::bindattr($self,ParaIterator,'$!current',current);
+        nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
+        nqp::bindattr($self,ParaIteratorIndexValue,'$!pulled',NEXT);
+        $self
+    }
+
+    method pull-one() {
+        if nqp::eqaddr($!pulled,NEXT) {
+            my $pulled := nqp::shift($!current);
+
+            nqp::while(
+              nqp::eqaddr($pulled,IterationEnd),
+              nqp::if(
+                nqp::elems($!queues),
+                ($pulled := nqp::shift($!current := nqp::shift($!queues))),
+                (return IterationEnd)
+              )
+            );
+
+            nqp::bindattr(self,ParaIteratorIndexValue,'$!pulled',$pulled);
+            $!index++;
+        }
+        else {
+            my $pulled := $!pulled;
+            nqp::bindattr(self,ParaIteratorIndexValue,'$!pulled',NEXT);
+            $pulled
+        }
+    }
+}
+
+#- ParaSeq ---------------------------------------------------------------------
+# The class containing all of the logic for parallel sequences
 class ParaSeq {
-    has      $!source;
-    has int  $.batch;
-    has int  $.degree;
+    has      $!source;    # source iterator
+    has      $!producer;  # iterator producing values
+    has int  $.degree;    # number of CPUs, must be > 1
+    has int  $.initial;   # initial batch size, must be > 0
+    has int  $.batch;     # current batch size, must be > 0
 
 #- private helper methods ------------------------------------------------------
 
     # Entry point in chain, from an Iterable
     method !from-iterable($source) {
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!batch',
-          nqp::getattr_i(self, ParaSeq, '$!batch')
+        nqp::bindattr_i($self, ParaSeq, '$!initial',
+          nqp::getattr_i(self, ParaSeq, '$!initial')
         );
         nqp::bindattr_i($self, ParaSeq, '$!degree',
           nqp::getattr_i(self, ParaSeq, '$!degree')
@@ -27,15 +157,20 @@ class ParaSeq {
     }
 
     # Entry point in chain, from an Iterator
-    method !from-iterator($source) {
+    method !from-iterator(\source) {
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!batch',
-          nqp::getattr_i(self, ParaSeq, '$!batch')
+        nqp::bindattr_i($self, ParaSeq, '$!initial',
+          nqp::getattr_i(self, ParaSeq, '$!initial')
         );
         nqp::bindattr_i($self, ParaSeq, '$!degree',
           nqp::getattr_i(self, ParaSeq, '$!degree')
         );
-        nqp::p6bindattrinvres($self, ParaSeq, '$!source', $source)
+        nqp::p6bindattrinvres($self, ParaSeq, '$!source', source)
+    }
+
+    # Fill buffer with a batch of values, return 1 if exhausted, else 0
+    method !batch($buffer) {
+        nqp::eqaddr($!source.push-exactly($buffer, $!batch),IterationEnd)
     }
 
 #- entry points ----------------------------------------------------------------
@@ -47,28 +182,39 @@ class ParaSeq {
         X::Invalid::Value.new(:$method, :name<batch>,  :value($!batch)).throw
           if $batch <= 0;
         X::Invalid::Value.new(:$method, :name<degree>, :value($!degree)).throw
-          if $degree <= 0;
+          if $degree <= 1;
 
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!batch',  $batch );
-        nqp::bindattr_i($self, ParaSeq, '$!degree', $degree);
+        nqp::bindattr_i($self, ParaSeq, '$!initial', $batch );
+        nqp::bindattr_i($self, ParaSeq, '$!degree',  $degree);
         nqp::p6bindattrinvres($self, ParaSeq, '$!source', $source.iterator)
     }
 
-#- where all the magic happens -------------------------------------------------
+#- where all the magic happens under the hood ----------------------------------
 
-    method iterator() { $!source }  # for now
+    # The producer acts as a normal iterator, producing values from
+    # queues that are filled asynchronously.  If there is no producer,
+    # then the source will act as the producer
+    multi method iterator(ParaSeq:D:) { $!producer // $!source }
 
 #- introspection ---------------------------------------------------------------
 
     method default-batch()  { $default-batch  }
     method default-degree() { $default-degree }
 
+    method degree(       ParaSeq:D:) { $!degree  }
+    method initial-batch(ParaSeq:D:) { $!initial }
+    method current-batch(ParaSeq:D:) { $!batch   }
+
 #- Iterable interfaces with special needs --------------------------------------
 
     proto method map(|) {*}
     multi method map(ParaSeq:D: Callable:D $mapper) {
-        self!from-iterable: self.Seq.map($mapper, |%_)
+        my $buffer := nqp::create(IterationBuffer);
+        return self!from-iterable($buffer.List.map($mapper))
+          if self!batch($buffer);
+
+        self!from-iterable: self.Seq.map($mapper)
     }
 
     proto method grep(|) {*}
@@ -80,9 +226,6 @@ class ParaSeq {
     }
 
     proto method first(|) {*}
-    multi method first(ParaSeq:D:) {
-        self.Seq.first
-    }
     multi method first(ParaSeq:D: Callable:D $matcher) {
         self.Seq.first($matcher, |%_)
     }
@@ -91,7 +234,7 @@ class ParaSeq {
     }
     multi method first(ParaSeq:D: $matcher, :$end!) {
         $end
-          ?? self.IterationBuffer.List.first($matcher, :$end, |%_)
+          ?? self.IterationBuffer.List.first($matcher, :end, |%_)
           !! self.first($matcher, |%_)
     }
 
@@ -108,17 +251,11 @@ class ParaSeq {
     }
 
     proto method head(|) {*}
-    multi method head(ParaSeq:D:) {
-        self.Seq.head
-    }
     multi method head(ParaSeq:D: |c) {
         self!from-iterable: self.Seq.head(|c)
     }
 
     proto method tail(|) {*}
-    multi method tail(ParaSeq:D:) {
-        self.Seq.tail
-    }
     multi method tail(ParaSeq:D: |c) {
         self!from-iterable: self.Seq.tail(|c)
     }
@@ -130,19 +267,25 @@ class ParaSeq {
             self.IterationBuffer, Mu
     }
 
-    proto method elems(|) {*}
+#- endpoints -------------------------------------------------------------------
+
+    multi method first(ParaSeq:D:) { self.Seq.first }
+    multi method head( ParaSeq:D:) { self.Seq.head  }
+    multi method tail( ParaSeq:D:) { self.Seq.tail  }
+
     multi method elems(ParaSeq:D:) {
         $!source.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.elems',"")
           !! nqp::elems(self.IterationBuffer)
     }
 
-    proto method end(|) {*}
     multi method end(ParaSeq:D:) {
         $!source.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.end',"")
           !! nqp::elems(self.IterationBuffer) - 1
     }
+
+    multi method is-lazy(ParaSeq:D:) { $!source.is-lazy }
 
 #- coercers --------------------------------------------------------------------
 
@@ -157,6 +300,8 @@ class ParaSeq {
     multi method Map(  ParaSeq:D:) { self.IterationBuffer.List.Map   }
     multi method Seq(  ParaSeq:D:) { Seq.new: self.iterator          }
     multi method Slip( ParaSeq:D:) { self.IterationBuffer.Slip       }
+
+    multi method serial(ParaSeq:D:) { self.Seq }
 }
 
 #- actual interface ------------------------------------------------------------
@@ -238,6 +383,20 @@ any sense at parallelization either.  So it won't.
 Note that the default initial batch size is B<10>, rather than B<64>
 in the current implementation of C<.hyper> and C<.race>, making the
 chance smaller that parallelization is abandoned too soon.
+
+=head2 Infectiousness
+
+The C<.serial> method or C<.Seq> coercer can be typically be used to
+"unhyper" a hypered sequence.  However many other interface methods do
+the same in the current implementation of C<.hyper> and C<.race>,
+thereby giving the impression that the flow is still parallelized.
+When in fact they aren't anymore.
+
+Also, hyperized sequences in the current implementation are considered
+to be non-lazy, even if the source B<is> lazy.
+
+This implementation aims to make all interface methods pass on the
+hypered nature and laziness of the sequence.
 
 =head2 Loop control statements
 
