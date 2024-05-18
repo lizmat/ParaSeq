@@ -27,38 +27,41 @@ my class ParaIterator does Iterator {
         $self
     }
 
-    method nr-queues()       { nqp::elems($!queues)      }
-    method add-queue(\queue) { nqp::push($!queues,queue) }
+    method nr-queues()          { nqp::elems($!queues)      }
+    method add-queue(Mu \queue) { nqp::push($!queues,queue) }
 
     method pull-one() {
         my $pulled := nqp::shift($!current);
 
         nqp::while(
-          nqp::eqaddr($pulled,IterationEnd),
+          nqp::eqaddr($pulled,IterationEnd),             # this queue exhausted
           nqp::if(
             nqp::eqaddr(($pulled := nqp::shift($!queues)),IterationEnd),
-            (return IterationEnd),  # really done
-            ($!current := $pulled)  # set next queue
+            (return IterationEnd),                       # no queue, really done
+            $pulled := nqp::shift($!current := $pulled)  # set next queue
           )
         );
 
         $pulled
     }
 
-    method push-all($target) {
+    method push-all(\target) {
+        my $queues  := $!queues;
+        my $current := $!current;
+
         nqp::while(
           1,
           nqp::stmts(
-            (my $pulled := nqp::shift($!current)),
+            (my $pulled := nqp::shift($current)),
             nqp::while(
-              nqp::eqaddr($pulled,IterationEnd),
+              nqp::eqaddr($pulled,IterationEnd),            # queue exhausted
               nqp::if(
-                nqp::eqaddr(($pulled := nqp::shift($!queues)),IterationEnd),
-                (return IterationEnd),  # really done
-                ($!current := $pulled)  # set next queue
+                nqp::eqaddr(($pulled := nqp::shift($queues)),IterationEnd),
+                (return IterationEnd),                      # really done
+                $pulled := nqp::shift($current := $pulled)  # set next queue
               )
             ),
-            nqp::push($target, $pulled)
+            nqp::push(target, $pulled)
           )
         );
     }
@@ -67,40 +70,87 @@ my class ParaIterator does Iterator {
 #- ParaSeq ---------------------------------------------------------------------
 # The class containing all of the logic for parallel sequences
 class ParaSeq {
-    has      $!source;    # source iterator
-    has      $!producer;  # iterator producing values
-    has int  $.degree;    # number of CPUs, must be > 1
-    has int  $.initial;   # initial batch size, must be > 0
-    has int  $.batch;     # current batch size, must be > 0
+    has     $!buffer;     # first buffer
+    has     $!source;     # iterator producing source values
+    has     $!result;     # iterator producing result values
+    has     $!SCHEDULER;  # $*SCHEDULER to be used
+    has int $.degree;     # number of CPUs, must be > 1
+    has int $.initial;    # initial batch size, must be > 0
+    has int $.batch;      # current batch size, must be > 0
+    has int $!stop;       # stop all processing if 1
 
 #- private helper methods ------------------------------------------------------
 
-    # Entry point in chain, from an Iterable
-    method !from-iterable($source) {
+    # Do error checking and set up object if all ok
+    method !setup(
+      str $method, int $initial, int $degree, $buffer, $source
+    ) is hidden-from-backtrace {
+        X::Invalid::Value.new(:$method, :name<batch>,  :value($initial)).throw
+          if $initial <= 0;
+        X::Invalid::Value.new(:$method, :name<degree>, :value($degree)).throw
+          if $degree <= 1;
+
+        # Set it up!
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!degree',
-          nqp::getattr_i(self, ParaSeq, '$!degree')
-        );
+        nqp::bindattr_i($self, ParaSeq, '$!degree',  $degree);
         nqp::bindattr_i($self, ParaSeq, '$!batch',
-          nqp::bindattr_i($self, ParaSeq, '$!initial',
-            nqp::getattr_i(self, ParaSeq, '$!initial')
-          )
+          nqp::bindattr_i($self, ParaSeq, '$!initial', $initial)
         );
-        nqp::p6bindattrinvres($self, ParaSeq, '$!source', $source.iterator)
+        nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $*SCHEDULER);
+        nqp::bindattr($self, ParaSeq, '$!buffer',    $buffer    );
+        nqp::bindattr($self, ParaSeq, '$!source',    $source    );
+        $self
+    }
+
+    # Start the async process with the first buffer and the given buffer
+    # queuing logic
+    method !start(&queue-buffer) {
+        my $first := $!buffer;
+        $!buffer  := Mu;  # release buffer in object
+
+        # Queue the first buffer we already filled, and set up the
+        # result iterator
+        $!result := my $result := ParaIterator.new(queue-buffer($first));
+
+        # Make sure the scheduling of further batches actually happen in a
+        # separate thread
+        my $source := $!source;
+        $!SCHEDULER.cue: {
+
+            # Until we have a buffer that's not full
+            nqp::until(
+              nqp::eqaddr(
+                $source.push-exactly(
+                  (my $buffer := nqp::create(IterationBuffer)),
+                  $!batch  # intentionally use the attribute so that any
+                           # changes to it will be reflected then
+                ),
+                IterationEnd
+              ),
+              $result.add-queue(queue-buffer($buffer))
+            );
+
+            # Some leftovers to process?
+            $result.add-queue(queue-buffer($buffer)) if nqp::elems($buffer);
+
+            # No more result queues will come
+            $result.add-queue(IterationEnd);
+        }
+
+        # All scheduled now, so let the show begin!
+        self
     }
 
     # Entry point in chain, from an Iterator
-    method !from-iterator(\source) {
+    method !pass-the-chain(\source) {
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!degree',
-          nqp::getattr_i(self, ParaSeq, '$!degree')
-        );
+        nqp::bindattr_i($self, ParaSeq, '$!degree', $!degree);
         nqp::bindattr_i($self, ParaSeq, '$!batch',
-          nqp::bindattr_i($self, ParaSeq, '$!initial',
-            nqp::getattr_i(self, ParaSeq, '$!initial')
-          )
+          nqp::bindattr_i($self, ParaSeq, '$!initial', $!initial)
         );
-        nqp::p6bindattrinvres($self, ParaSeq, '$!source', source)
+        nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $!SCHEDULER);
+        nqp::bindattr($self, ParaSeq, '$!source',    source     );
+        $self
     }
 
     # Fill buffer with a batch of values, return 1 if exhausted, else 0
@@ -110,29 +160,26 @@ class ParaSeq {
 
 #- entry points ----------------------------------------------------------------
 
-    # Entry point from the subs
+    # Entry point from the subs: made as small as possible so that the
+    # fast path for iterators that don't produce enough values to warrant
+    # paralellization, will quickly continue as if nothing happenend
     method parent($source, int $initial, int $degree, str $method) {
+        my $iterator := $source.iterator;
+        my $buffer   := nqp::create(IterationBuffer);
 
-        # sanity check
-        X::Invalid::Value.new(:$method, :name<batch>,  :value($!batch)).throw
-          if $initial <= 0;
-        X::Invalid::Value.new(:$method, :name<degree>, :value($!degree)).throw
-          if $degree <= 1;
-
-        my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!degree',  $degree);
-        nqp::bindattr_i($self, ParaSeq, '$!batch',
-          nqp::bindattr_i($self, ParaSeq, '$!initial', $initial)
-        );
-        nqp::p6bindattrinvres($self, ParaSeq, '$!source', $source.iterator)
+        nqp::eqaddr($iterator.push-exactly($buffer, $initial),IterationEnd)
+          # First batch already exhausted iterator, so work with buffer
+          ?? $buffer.Seq
+          # Need to actually parallelize, set up ParaSeq object
+          !! self!setup($method, $initial, $degree, $buffer, $iterator)
     }
 
 #- where all the magic happens under the hood ----------------------------------
 
-    # The producer acts as a normal iterator, producing values from
-    # queues that are filled asynchronously.  If there is no producer,
-    # then the source will act as the producer
-    multi method iterator(ParaSeq:D:) { $!producer // $!source }
+    # Acts as a normal iterator, producing values from queues that are
+    # filled asynchronously.  If there is no result iterator, then the
+    # source iterator will be assumed
+    multi method iterator(ParaSeq:D:) { $!result // $!source }
 
 #- introspection ---------------------------------------------------------------
 
@@ -147,86 +194,121 @@ class ParaSeq {
 
     proto method map(|) {*}
     multi method map(ParaSeq:D: Callable:D $mapper) {
-#        my $buffer := nqp::create(IterationBuffer);
-#        return self!from-iterable($buffer.List.map($mapper))
-#          if self!batch($buffer);
 
-        self!from-iterable: self.Seq.map($mapper)
+        # Logic for queuing a buffer for result producing
+        my $SCHEDULER := $!SCHEDULER;
+        sub queue-buffer($buffer) {
+            my $queue  := nqp::create(ParaQueue);
+            $SCHEDULER.cue: {
+                my $iterator := $buffer.Seq.map($mapper).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd),
+                  nqp::push($queue,$pulled)
+                );
+
+                # Indicate this result queue is done
+                nqp::push($queue,IterationEnd);
+            }
+            $queue
+        }
+
+        # Let's go!
+        self!start(&queue-buffer)
     }
 
     proto method grep(|) {*}
     multi method grep(ParaSeq:D: Callable:D $matcher) {
-#        my $buffer := nqp::create(IterationBuffer);
-#        return self!from-iterable($buffer.List.grep($matcher, |%_))
-#          if self!batch($buffer);
 
-        self!from-iterable: self.Seq.grep($matcher, |%_)
+        # Logic for queuing a buffer for result producing
+        my $SCHEDULER := $!SCHEDULER;
+        sub queue-buffer($buffer) {
+            my $queue  := nqp::create(ParaQueue);
+            $SCHEDULER.cue: {
+                my $iterator := $buffer.Seq.grep($matcher).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd),
+                  nqp::push($queue,$pulled)
+                );
+
+                # Indicate this result queue is done
+                nqp::push($queue,IterationEnd);
+            }
+            $queue
+        }
+
+        # Let's go!
+        self!start(&queue-buffer)
     }
     multi method grep(ParaSeq:D: $matcher) {
-#        my $buffer := nqp::create(IterationBuffer);
-#        return self!from-iterable($buffer.List.grep($matcher, |%_))
-#          if self!batch($buffer);
 
-        self!from-iterable: self.Seq.grep($matcher, |%_)
-    }
+        # Logic for queuing a buffer for result producing
+        my $SCHEDULER := $!SCHEDULER;
+        sub queue-buffer($buffer) {
+            my $queue  := nqp::create(ParaQueue);
+            $SCHEDULER.cue: {
+                my $iterator := $buffer.Seq.grep($matcher).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd),
+                  nqp::push($queue,$pulled)
+                );
 
-    proto method first(|) {*}
-    multi method first(ParaSeq:D: Callable:D $matcher) {
-#        my $buffer := nqp::create(IterationBuffer);
-#        return self!from-iterable($buffer.List.first($matcher, |%_))
-#          if self!batch($buffer);
+                # Indicate this result queue is done
+                nqp::push($queue,IterationEnd);
+            }
+            $queue
+        }
 
-        self.Seq.first($matcher, |%_)
-    }
-    multi method first(ParaSeq:D: $matcher) {
-#        my $buffer := nqp::create(IterationBuffer);
-#        return self!from-iterable($buffer.List.first($matcher, |%_))
-#          if self!batch($buffer);
-
-        self.Seq.first($matcher, |%_)
-    }
-    multi method first(ParaSeq:D: $matcher, :$end!) {
-#        my $buffer := nqp::create(IterationBuffer);
-#        return self!from-iterable($buffer.List.first($matcher, |%_))
-#          if self!batch($buffer);
-
-        $end
-          ?? self.IterationBuffer.List.first($matcher, :end, |%_)
-          !! self.first($matcher, |%_)
+        # Let's go!
+        self!start(&queue-buffer)
     }
 
 #- standard Iterable interfaces ------------------------------------------------
 
     proto method invert(|) {*}
     multi method invert(ParaSeq:D:) {
-        self!from-iterable: self.Seq.invert
+        self!pass-the-chain: self.Seq.invert.iterator
     }
 
     proto method skip(|) {*}
     multi method skip(ParaSeq:D: |c) {
-        self!from-iterable: self.Seq.skip(|c)
+        self!pass-the-chain: self.Seq.skip(|c).iterator
     }
 
     proto method head(|) {*}
     multi method head(ParaSeq:D: |c) {
-        self!from-iterable: self.Seq.head(|c)
+        self!pass-the-chain: self.Seq.head(|c).iterator
     }
 
     proto method tail(|) {*}
     multi method tail(ParaSeq:D: |c) {
-        self!from-iterable: self.Seq.tail(|c)
+        self!pass-the-chain: self.Seq.tail(|c).iterator
     }
 
     proto method reverse(|) {*}
     multi method reverse(ParaSeq:D:) {
-        self!from-iterator:
+        self!pass-the-chain:
           Rakudo::Iterator.ReifiedReverse:
             self.IterationBuffer, Mu
     }
 
 #- endpoints -------------------------------------------------------------------
 
-    multi method first(ParaSeq:D:) { self.Seq.first }
+    proto method first(|) {*}
+    multi method first(ParaSeq:D:) {
+        self.Seq.first
+    }
+    multi method first(ParaSeq:D: Callable:D $matcher) {
+        self.Seq.first($matcher, |%_)
+    }
+    multi method first(ParaSeq:D: $matcher) {
+        self.Seq.first($matcher, |%_)
+    }
+    multi method first(ParaSeq:D: $matcher, :$end!) {
+        $end
+          ?? self.IterationBuffer.List.first($matcher, :end, |%_)
+          !! self.first($matcher, |%_)
+    }
+
     multi method head( ParaSeq:D:) { self.Seq.head  }
     multi method tail( ParaSeq:D:) { self.Seq.tail  }
 
