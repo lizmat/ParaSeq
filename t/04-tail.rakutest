@@ -3,20 +3,23 @@ use ParaSeq;
 
 plan 10;
 
-my constant @list   = (^200000).List;
+my constant $elems = 200000;
+my constant $batch = 2000;
+my constant @list  = (^$elems).List;
+
 my constant $tail   = @list.tail;
 my constant $tail3  = @list.tail(3).List;
 my constant $tailw3 = @list.tail(*-3).List;
 
 for 1, ParaSeq.default-degree {
-    is-deeply @list.&hyperize(2000, $_).tail, $tail,
+    is-deeply @list.&hyperize($batch, $_).tail, $tail,
       "tail with degree $_";
 
-    my $seq := @list.&hyperize(2000, $_).tail(3);
+    my $seq := @list.&hyperize($batch, $_).tail(3);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $tail3, "tail(3) with degree = $_";
 
-    $seq := @list.&hyperize(2000, $_).tail(*-3);
+    $seq := @list.&hyperize($batch, $_).tail(*-3);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $tailw3, "tail(*-3) with degree = $_";
 }

@@ -6,25 +6,28 @@ plan 18;
 ok &hyperize, 'was hyperize exported';
 ok &racify,   'was racify exported';
 
-my constant @list = (^200000).List;
+my constant $elems = 200000;
+my constant $batch = 2000;
+my constant @list  = (^$elems).List;
+
 isa-ok @list.&hyperize, ParaSeq, 'did hyperize produce a ParaSeq';
 isa-ok @list.&racify,   ParaSeq, 'did racify produce a ParaSeq';
 
 for 1, ParaSeq.default-degree {
-    is-deeply @list.&hyperize(2000, $_).Array, [@list],
+    is-deeply @list.&hyperize($batch, $_).Array, [@list],
       "did .Array produce ok with degree $_";
-    is-deeply @list.&hyperize(2000, $_).Hash, @list.Hash,
+    is-deeply @list.&hyperize($batch, $_).Hash, @list.Hash,
       "did .Hash produce ok with degree $_";
-    is-deeply @list.&hyperize(2000, $_).List, @list,
+    is-deeply @list.&hyperize($batch, $_).List, @list,
       "did .List produce ok with degree $_";
-    is-deeply @list.&hyperize(2000, $_).Map, @list.Map,
+    is-deeply @list.&hyperize($batch, $_).Map, @list.Map,
       "did .Map produce ok with degree $_";
-    is-deeply @list.&hyperize(2000, $_).Seq, @list.Seq,
+    is-deeply @list.&hyperize($batch, $_).Seq, @list.Seq,
       "did .Seq produce ok with degree $_";
-    is-deeply @list.&hyperize(2000, $_).Slip, @list.Slip,
+    is-deeply @list.&hyperize($batch, $_).Slip, @list.Slip,
       "did .Slip produce ok with degree $_";
 
-    is-deeply @list.&hyperize(2000, $_).serial, @list.serial,
+    is-deeply @list.&hyperize($batch, $_).serial, @list.serial,
       "did .serial produce ok with degree $_";
 }
 

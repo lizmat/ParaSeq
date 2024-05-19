@@ -3,11 +3,14 @@ use ParaSeq;
 
 plan 4;
 
-my constant @list = (^200000).List;
+my constant $elems = 200000;
+my constant $batch = 2000;
+my constant @list  = (^$elems).List;
+
 my constant @tsil = @list.reverse;
 
 for 1, ParaSeq.default-degree {
-    my $seq := @list.&hyperize(2000, $_).reverse;
+    my $seq := @list.&hyperize($batch, $_).reverse;
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, @tsil, "reverse with degree = $_";
 }

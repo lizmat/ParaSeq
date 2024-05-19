@@ -10,6 +10,37 @@ my int $default-degree = Kernel.cpu-cores-but-one;
 # can nqp::shift
 my class ParaQueue is repr('ConcBlockingQueue') { }
 
+#- BufferIterator --------------------------------------------------------------
+# An iterator that takes a buffer and an iterator, and first produces all
+# of the values from the buffer, and then from the iterator
+
+my class BufferIterator does Iterator {
+    has $!buffer;
+    has $!iterator;
+
+    method new($buffer, $iterator) {
+        my $self := nqp::create(self);
+        nqp::bindattr($self,BufferIterator,'$!buffer',  nqp::decont($buffer));
+        nqp::bindattr($self,BufferIterator,'$!iterator',$iterator           );
+        $self
+    }
+
+    method pull-one() {
+        nqp::elems($!buffer)
+          ?? nqp::shift($!buffer)
+          !! $!iterator.pull-one
+    }
+
+    method push-all(\target) {
+        nqp::istype(target, IterationBuffer)
+          ?? nqp::splice(target, $!buffer, nqp::elems(target), 0)
+          !! $!buffer.iterator.push-all(target);
+        $!buffer := Mu;
+
+        $!iterator.push-all(target)
+    }
+}
+
 #- ParaIterator ----------------------------------------------------------------
 # An iterator that takes a number of ParaQueues and produces all values
 # from them until the last ParaQueue has been exhausted.  Note that the
@@ -96,10 +127,15 @@ class ParaSeq {
         nqp::bindattr_i($self, ParaSeq, '$!batch',
           nqp::bindattr_i($self, ParaSeq, '$!initial', $initial)
         );
-        nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $*SCHEDULER);
-        nqp::bindattr($self, ParaSeq, '$!buffer',    $buffer    );
-        nqp::bindattr($self, ParaSeq, '$!source',    $source    );
+        nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $*SCHEDULER         );
+        nqp::bindattr($self, ParaSeq, '$!buffer',    nqp::decont($buffer));
+        nqp::bindattr($self, ParaSeq, '$!source',    $source             );
         $self
+    }
+
+    # Coerce into Seq, taking into account the first buffer
+    method !reSeq() {
+        Seq.new: $!result := BufferIterator.new($!buffer, $!source);
     }
 
     # Start the async process with the first buffer and the given buffer
@@ -125,9 +161,9 @@ class ParaSeq {
         my $source := $!source;
         $!SCHEDULER.cue: {
 
-            # Until we have a buffer that's not full
+            # Until we're halted or have a buffer that's not full
             nqp::until(
-              nqp::eqaddr(
+              $!stop || nqp::eqaddr(
                 $source.push-exactly(
                   (my $buffer := nqp::create(IterationBuffer)),
                   $!batch  # intentionally use the attribute so that any
@@ -159,6 +195,17 @@ class ParaSeq {
         nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $!SCHEDULER);
         nqp::bindattr($self, ParaSeq, '$!source',    source     );
         $self
+    }
+
+    # Just count the number of produced values
+    method !count() {
+        my $iterator := self.iterator;
+        my int $elems = nqp::elems($!buffer);
+        nqp::until(
+          nqp::eqaddr($iterator.pull-one, IterationEnd),
+          ++$elems
+        );
+        $elems
     }
 
 #- entry points ----------------------------------------------------------------
@@ -193,7 +240,7 @@ class ParaSeq {
     method initial-batch(ParaSeq:D:) { $!initial }
     method current-batch(ParaSeq:D:) { $!batch   }
 
-#- Iterable interfaces with special needs --------------------------------------
+#- map -------------------------------------------------------------------------
 
     proto method map(|) {*}
     multi method map(ParaSeq:D: Callable:D $mapper) {
@@ -219,6 +266,8 @@ class ParaSeq {
         my $count := $mapper.count;
         self!start(&queue-buffer, $count == Inf ?? 1 !! $count)
     }
+
+#- grep ------------------------------------------------------------------------
 
     proto method grep(|) {*}
     multi method grep(ParaSeq:D: Callable:D $matcher, :$k, :$kv, :$p) {
@@ -394,36 +443,7 @@ class ParaSeq {
         self!start($k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v)
     }
 
-#- standard Iterable interfaces ------------------------------------------------
-
-    proto method invert(|) {*}
-    multi method invert(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.invert.iterator
-    }
-
-    proto method skip(|) {*}
-    multi method skip(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.skip(|c).iterator
-    }
-
-    proto method head(|) {*}
-    multi method head(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.head(|c).iterator
-    }
-
-    proto method tail(|) {*}
-    multi method tail(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.tail(|c).iterator
-    }
-
-    proto method reverse(|) {*}
-    multi method reverse(ParaSeq:D:) {
-        self!pass-the-chain:
-          Rakudo::Iterator.ReifiedReverse:
-            self.IterationBuffer, Mu
-    }
-
-#- endpoints -------------------------------------------------------------------
+#- first -----------------------------------------------------------------------
 
     proto method first(|) {*}
     multi method first(ParaSeq:D:) {
@@ -441,22 +461,53 @@ class ParaSeq {
           !! self.first($matcher, |%_)
     }
 
-    multi method head( ParaSeq:D:) { self.Seq.head  }
-    multi method tail( ParaSeq:D:) { self.Seq.tail  }
+#- other standard Iterable interfaces ------------------------------------------
+
+    proto method invert(|) {*}
+    multi method invert(ParaSeq:D:) {
+        self!pass-the-chain: self!reSeq.invert.iterator
+    }
+
+    proto method skip(|) {*}
+    multi method skip(ParaSeq:D: |c) {
+        self!pass-the-chain: self!reSeq.skip(|c).iterator
+    }
+
+    proto method head(|) {*}
+    multi method head(ParaSeq:D: |c) {
+        self!pass-the-chain: self!reSeq.head(|c).iterator
+    }
+
+    proto method tail(|) {*}
+    multi method tail(ParaSeq:D: |c) {
+        self!pass-the-chain: self!reSeq.tail(|c).iterator
+    }
+
+    proto method reverse(|) {*}
+    multi method reverse(ParaSeq:D:) {
+        self!pass-the-chain:
+          Rakudo::Iterator.ReifiedReverse:
+            self.IterationBuffer, Mu
+    }
+
+#- endpoints -------------------------------------------------------------------
 
     multi method elems(ParaSeq:D:) {
         $!source.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.elems',"")
-          !! nqp::elems(self.IterationBuffer)
+          !! self!count
     }
 
     multi method end(ParaSeq:D:) {
         $!source.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.end',"")
-          !! nqp::elems(self.IterationBuffer) - 1
+          !! self!count - 1
     }
 
+    multi method head(   ParaSeq:D:) { self!reSeq.head  }
+    multi method tail(   ParaSeq:D:) { self!reSeq.tail  }
     multi method is-lazy(ParaSeq:D:) { $!source.is-lazy }
+
 
 #- coercers --------------------------------------------------------------------
 

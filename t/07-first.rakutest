@@ -3,44 +3,48 @@ use ParaSeq;
 
 plan 22;
 
-my constant @list      = (^200000).reverse.List;
+my constant $elems = 200000;
+my constant $batch = 2000;
+my constant @list  = (^$elems).reverse.List;
+
+my constant $grepper   = * %% 2;
 my constant $first     = @list.first;
-my constant $first2    = @list.first(* %% 2);
-my constant $first2e   = @list.first(* %% 2, :end);
-my constant $first2k   = @list.first(* %% 2, :k);
-my constant $first2ke  = @list.first(* %% 2, :k, :end);
-my constant $first2p   = @list.first(* %% 2, :p);
-my constant $first2pe  = @list.first(* %% 2, :p, :end);
-my constant $first2kv  = @list.first(* %% 2, :kv);
-my constant $first2kve = @list.first(* %% 2, :kv, :end);
+my constant $first2    = @list.first($grepper);
+my constant $first2e   = @list.first($grepper, :end);
+my constant $first2k   = @list.first($grepper, :k);
+my constant $first2ke  = @list.first($grepper, :k, :end);
+my constant $first2p   = @list.first($grepper, :p);
+my constant $first2pe  = @list.first($grepper, :p, :end);
+my constant $first2kv  = @list.first($grepper, :kv);
+my constant $first2kve = @list.first($grepper, :kv, :end);
 
 for 1, ParaSeq.default-degree {
-    is-deeply @list.&hyperize(2000, $_).first, $first,
+    is-deeply @list.&hyperize($batch, $_).first, $first,
       "first with degree $_";
 
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2), $first2,
+    is-deeply @list.&hyperize($batch, $_).first($grepper), $first2,
       "first(* %% 2) with degree = $_";
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2, :v), $first2,
+    is-deeply @list.&hyperize($batch, $_).first($grepper, :v), $first2,
       "first(* %% 2, :v) with degree = $_";
 
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2, :end), $first2e,
+    is-deeply @list.&hyperize($batch, $_).first($grepper, :end), $first2e,
       "first(%% * 2, :end) with degree = $_";
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2, :v, :end), $first2e,
+    is-deeply @list.&hyperize($batch, $_).first($grepper, :v, :end), $first2e,
       "first(%% * 2, :v, :end) with degree = $_";
 
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2, :k), $first2k,
+    is-deeply @list.&hyperize($batch, $_).first($grepper, :k), $first2k,
       "first(%% * 2, :k) with degree = $_";
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2, :k, :end), $first2ke,
+    is-deeply @list.&hyperize($batch, $_).first($grepper, :k, :end), $first2ke,
       "first(%% * 2, :k, :end) with degree = $_";
 
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2, :p), $first2p,
+    is-deeply @list.&hyperize($batch, $_).first($grepper, :p), $first2p,
       "first(%% * 2, :p) with degree = $_";
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2, :p, :end), $first2pe,
+    is-deeply @list.&hyperize($batch, $_).first($grepper, :p, :end), $first2pe,
       "first(%% * 2, :p, :end) with degree = $_";
 
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2, :kv), $first2kv,
+    is-deeply @list.&hyperize($batch, $_).first($grepper, :kv), $first2kv,
       "first(%% * 2, :kv) with degree = $_";
-    is-deeply @list.&hyperize(2000, $_).first(* %% 2, :kv, :end), $first2kve,
+    is-deeply @list.&hyperize($batch, $_).first($grepper, :kv, :end), $first2kve,
       "first(%% * 2, :kv, :end) with degree = $_";
 }
 
