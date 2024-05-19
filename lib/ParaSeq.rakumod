@@ -104,13 +104,21 @@ class ParaSeq {
 
     # Start the async process with the first buffer and the given buffer
     # queuing logic
-    method !start(&queue-buffer) {
+    method !start(&queue-buffer, int $divisibility = 1) {
+
+        # Local copy of first buffer
         my $first := $!buffer;
         $!buffer  := Mu;  # release buffer in object
 
         # Queue the first buffer we already filled, and set up the
         # result iterator
         $!result := my $result := ParaIterator.new(queue-buffer($first));
+
+        # Make sure batch size has the right granularity
+        unless $!batch %% $divisibility {
+            $!batch =
+              $!batch div $divisibility * $divisibility || $divisibility;
+        }
 
         # Make sure the scheduling of further batches actually happen in a
         # separate thread
@@ -208,7 +216,8 @@ class ParaSeq {
         }
 
         # Let's go!
-        self!start(&queue-buffer)
+        my $count := $mapper.count;
+        self!start(&queue-buffer, $count == Inf ?? 1 !! $count)
     }
 
     proto method grep(|) {*}
@@ -216,8 +225,8 @@ class ParaSeq {
         my $SCHEDULER := $!SCHEDULER;
         my int $base;  # base offset for :k, :kv, :p
 
-        # Logic for queuing a buffer for bare grep
-        sub queue-buffer($buffer) {
+        # Logic for queuing a buffer for bare grep { }, producing values
+        sub v($buffer) {
             my $queue := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
                 my $iterator := $buffer.Seq.grep($matcher).iterator;
@@ -232,8 +241,8 @@ class ParaSeq {
             $queue
         }
 
-        # Logic for queuing a buffer for grep :k
-        sub queue-buffer-k($buffer) {
+        # Logic for queuing a buffer for grep { } :k
+        sub k($buffer) {
             my int $offset = $base;
             $base = $base + nqp::elems(nqp::decont($buffer));
 
@@ -251,8 +260,8 @@ class ParaSeq {
             $queue
         }
 
-        # Logic for queuing a buffer for grep :kv
-        sub queue-buffer-kv($buffer) {
+        # Logic for queuing a buffer for grep { } :kv
+        sub kv($buffer) {
             my int $offset = $base;
             $base = $base + nqp::elems(nqp::decont($buffer));
 
@@ -271,8 +280,8 @@ class ParaSeq {
             $queue
         }
 
-        # Logic for queuing a buffer for grep :p
-        sub queue-buffer-p($buffer) {
+        # Logic for queuing a buffer for grep { } :p
+        sub p($buffer) {
             my int $offset = $base;
             $base = $base + nqp::elems(nqp::decont($buffer));
 
@@ -294,20 +303,18 @@ class ParaSeq {
         }
 
         # Let's go!
-        self!start($k
-          ?? &queue-buffer-k
-          !! $kv
-            ?? &queue-buffer-kv
-            !! $p
-              ?? &queue-buffer-p
-              !! &queue-buffer
+        my $count := $matcher.count;
+        self!start(
+          $k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v,
+          $count == Inf ?? 1 !! $count
         )
     }
-    multi method grep(ParaSeq:D: $matcher) {
-
-        # Logic for queuing a buffer for result producing
+    multi method grep(ParaSeq:D: $matcher, :$k, :$kv, :$p) {
         my $SCHEDULER := $!SCHEDULER;
-        sub queue-buffer($buffer) {
+        my int $base;  # base offset for :k, :kv, :p
+
+        # Logic for queuing a buffer for grep /.../
+        sub v($buffer) {
             my $queue  := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
                 my $iterator := $buffer.Seq.grep($matcher).iterator;
@@ -322,8 +329,69 @@ class ParaSeq {
             $queue
         }
 
+        # Logic for queuing a buffer for grep /.../ :k
+        sub k($buffer) {
+            my int $offset = $base;
+            $base = $base + nqp::elems(nqp::decont($buffer));
+
+            my $queue := nqp::create(ParaQueue);
+            $SCHEDULER.cue: {
+                my $iterator := $buffer.Seq.grep($matcher, :k).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::push($queue,$offset + $key)
+                );
+
+                # Indicate this result queue is done
+                nqp::push($queue,IterationEnd);
+            }
+            $queue
+        }
+
+        # Logic for queuing a buffer for grep /.../ :kv
+        sub kv($buffer) {
+            my int $offset = $base;
+            $base = $base + nqp::elems(nqp::decont($buffer));
+
+            my $queue := nqp::create(ParaQueue);
+            $SCHEDULER.cue: {
+                my $iterator := $buffer.Seq.grep($matcher, :kv).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::push($queue,$offset + $key),      # key
+                  nqp::push($queue,$iterator.pull-one),  # value
+                );
+
+                # Indicate this result queue is done
+                nqp::push($queue,IterationEnd);
+            }
+            $queue
+        }
+
+        # Logic for queuing a buffer for grep /.../ :p
+        sub p($buffer) {
+            my int $offset = $base;
+            $base = $base + nqp::elems(nqp::decont($buffer));
+
+            my $queue := nqp::create(ParaQueue);
+            $SCHEDULER.cue: {
+                my $iterator := $buffer.Seq.grep($matcher, :kv).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::push(
+                    $queue,
+                    Pair.new($offset + $key, $iterator.pull-one)
+                  )
+                );
+
+                # Indicate this result queue is done
+                nqp::push($queue,IterationEnd);
+            }
+            $queue
+        }
+
         # Let's go!
-        self!start(&queue-buffer)
+        self!start($k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v)
     }
 
 #- standard Iterable interfaces ------------------------------------------------
