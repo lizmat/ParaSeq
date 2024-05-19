@@ -48,12 +48,14 @@ my class BufferIterator does Iterator {
 # and removed in a thread-safe manner
 
 my class ParaIterator does Iterator {
-    has $!current;
-    has $!queues;
+    has $!current;   # current producer
+    has $!queues;    # other queues to produce from
+    has $!pressure;  # backpressure provider
 
-    method new(\current) {
+    method new(\current, \pressure) {
         my $self := nqp::create(self);
         nqp::bindattr($self,ParaIterator,'$!current',current);
+        nqp::bindattr($self,ParaIterator,'$!pressure',pressure);
         nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
         $self
     }
@@ -65,11 +67,14 @@ my class ParaIterator does Iterator {
         my $pulled := nqp::shift($!current);
 
         nqp::while(
-          nqp::eqaddr($pulled,IterationEnd),             # this queue exhausted
+          nqp::eqaddr($pulled,IterationEnd),               # queue exhausted
           nqp::if(
             nqp::eqaddr(($pulled := nqp::shift($!queues)),IterationEnd),
-            (return IterationEnd),                       # no queue, really done
-            $pulled := nqp::shift($!current := $pulled)  # set next queue
+            (return IterationEnd),                         # no queue left, done
+            nqp::stmts(                                    # one more queue
+              nqp::push($!pressure,0),                     # allow more work
+              $pulled := nqp::shift($!current := $pulled)  # set next queue
+            )
           )
         );
 
@@ -77,19 +82,23 @@ my class ParaIterator does Iterator {
     }
 
     method push-all(\target) {
-        my $queues  := $!queues;
-        my $current := $!current;
+        my $current  := $!current;
+        my $queues   := $!queues;
+        my $pressure := $!pressure;
 
         nqp::while(
           1,
           nqp::stmts(
             (my $pulled := nqp::shift($current)),
             nqp::while(
-              nqp::eqaddr($pulled,IterationEnd),            # queue exhausted
+              nqp::eqaddr($pulled,IterationEnd),              # queue exhausted
               nqp::if(
                 nqp::eqaddr(($pulled := nqp::shift($queues)),IterationEnd),
-                (return IterationEnd),                      # really done
-                $pulled := nqp::shift($current := $pulled)  # set next queue
+                (return IterationEnd),                        # really done
+                nqp::stmts(                                   # one more queue
+                  nqp::push($pressure,0),                     # allow more work
+                  $pulled := nqp::shift($current := $pulled)  # set next queue
+                )
               )
             ),
             nqp::push(target, $pulled)
@@ -135,21 +144,24 @@ class ParaSeq {
 
     # Start the async process with the first buffer and the given buffer
     # queuing logic
-    method !start(&queue-buffer, int $divisibility = 1) {
+    method !start(&queue-buffer, int $granularity = 1) {
 
         # Local copy of first buffer
         my $first := $!buffer;
         $!buffer  := Mu;  # release buffer in object
 
+        # Set up back pressure queue
+        my $pressure := nqp::create(ParaQueue);
+        nqp::push($pressure, 0) for ^$!degree;
+
         # Queue the first buffer we already filled, and set up the
         # result iterator
-        $!result := my $result := ParaIterator.new(queue-buffer($first));
+        $!result := my $result :=
+          ParaIterator.new(queue-buffer($first), $pressure);
 
         # Make sure batch size has the right granularity
-        unless $!batch %% $divisibility {
-            $!batch =
-              $!batch div $divisibility * $divisibility || $divisibility;
-        }
+        $!batch = $!batch div $granularity * $granularity || $granularity
+          unless $!batch %% $granularity;
 
         # Make sure the scheduling of further batches actually happen in a
         # separate thread
@@ -158,14 +170,16 @@ class ParaSeq {
 
             # Until we're halted or have a buffer that's not full
             nqp::until(
-              $!stop || nqp::eqaddr(
-                $source.push-exactly(
-                  (my $buffer := nqp::create(IterationBuffer)),
-                  $!batch  # intentionally use the attribute so that any
-                           # changes to it will be reflected then
-                ),
-                IterationEnd
-              ),
+              nqp::eqaddr(nqp::shift($pressure),IterationEnd)
+                || $!stop
+                || nqp::eqaddr(
+                     $source.push-exactly(
+                       (my $buffer := nqp::create(IterationBuffer)),
+                       $!batch  # intentionally use the attribute so that any
+                                # changes to it will be reflected then
+                     ),
+                     IterationEnd
+                   ),
               $result.add-queue(queue-buffer($buffer))
             );
 
