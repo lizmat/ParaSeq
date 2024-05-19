@@ -3,8 +3,8 @@ use ParaSeq;
 
 plan 10;
 
-my constant $elems = 20; #0000;
-my constant $batch = 2; #000;
+my constant $elems = 200000;
+my constant $batch = 2000;
 my constant @list  = (^$elems).List;
 
 my constant $head   = @list.head;

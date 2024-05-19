@@ -133,11 +133,6 @@ class ParaSeq {
         $self
     }
 
-    # Coerce into Seq, taking into account the first buffer
-    method !reSeq() {
-        Seq.new: $!result := BufferIterator.new($!buffer, $!source);
-    }
-
     # Start the async process with the first buffer and the given buffer
     # queuing logic
     method !start(&queue-buffer, int $divisibility = 1) {
@@ -200,7 +195,7 @@ class ParaSeq {
     # Just count the number of produced values
     method !count() {
         my $iterator := self.iterator;
-        my int $elems = nqp::elems($!buffer);
+        my int $elems;
         nqp::until(
           nqp::eqaddr($iterator.pull-one, IterationEnd),
           ++$elems
@@ -228,8 +223,13 @@ class ParaSeq {
 
     # Acts as a normal iterator, producing values from queues that are
     # filled asynchronously.  If there is no result iterator, then the
-    # source iterator will be assumed
-    multi method iterator(ParaSeq:D:) { $!result // $!source }
+    # source iterator be recreated using the initial buffer if there is
+    # one.  Otherwise
+    multi method iterator(ParaSeq:D:) {
+        $!result //= nqp::istype($!buffer,IterationBuffer)
+          ?? BufferIterator.new($!buffer, $!source)
+          !! $!source
+    }
 
 #- introspection ---------------------------------------------------------------
 
@@ -465,22 +465,22 @@ class ParaSeq {
 
     proto method invert(|) {*}
     multi method invert(ParaSeq:D:) {
-        self!pass-the-chain: self!reSeq.invert.iterator
+        self!pass-the-chain: self.Seq.invert.iterator
     }
 
     proto method skip(|) {*}
     multi method skip(ParaSeq:D: |c) {
-        self!pass-the-chain: self!reSeq.skip(|c).iterator
+        self!pass-the-chain: self.Seq.skip(|c).iterator
     }
 
     proto method head(|) {*}
     multi method head(ParaSeq:D: |c) {
-        self!pass-the-chain: self!reSeq.head(|c).iterator
+        self!pass-the-chain: self.Seq.head(|c).iterator
     }
 
     proto method tail(|) {*}
     multi method tail(ParaSeq:D: |c) {
-        self!pass-the-chain: self!reSeq.tail(|c).iterator
+        self!pass-the-chain: self.Seq.tail(|c).iterator
     }
 
     proto method reverse(|) {*}
@@ -504,12 +504,13 @@ class ParaSeq {
           !! self!count - 1
     }
 
-    multi method head(   ParaSeq:D:) { self!reSeq.head  }
-    multi method tail(   ParaSeq:D:) { self!reSeq.tail  }
+    multi method head(   ParaSeq:D:) { self.Seq.head  }
+    multi method tail(   ParaSeq:D:) { self.Seq.tail  }
     multi method is-lazy(ParaSeq:D:) { $!source.is-lazy }
 
 
 #- coercers --------------------------------------------------------------------
+
 
     multi method IterationBuffer(ParaSeq:D:) {
         self.iterator.push-all(my $buffer := nqp::create(IterationBuffer));
