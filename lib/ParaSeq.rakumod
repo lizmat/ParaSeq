@@ -153,11 +153,6 @@ class ParaSeq {
         $self
     }
 
-    # Fill buffer with a batch of values, return 1 if exhausted, else 0
-    method !batch($buffer) {
-        nqp::eqaddr($!source.push-exactly($buffer, $!batch),IterationEnd)
-    }
-
 #- entry points ----------------------------------------------------------------
 
     # Entry point from the subs: made as small as possible so that the
@@ -195,10 +190,10 @@ class ParaSeq {
     proto method map(|) {*}
     multi method map(ParaSeq:D: Callable:D $mapper) {
 
-        # Logic for queuing a buffer for result producing
+        # Logic for queuing a buffer for map
         my $SCHEDULER := $!SCHEDULER;
         sub queue-buffer($buffer) {
-            my $queue  := nqp::create(ParaQueue);
+            my $queue := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
                 my $iterator := $buffer.Seq.map($mapper).iterator;
                 nqp::until(
@@ -217,12 +212,13 @@ class ParaSeq {
     }
 
     proto method grep(|) {*}
-    multi method grep(ParaSeq:D: Callable:D $matcher) {
-
-        # Logic for queuing a buffer for result producing
+    multi method grep(ParaSeq:D: Callable:D $matcher, :$k, :$kv, :$p) {
         my $SCHEDULER := $!SCHEDULER;
+        my int $base;  # base offset for :k, :kv, :p
+
+        # Logic for queuing a buffer for bare grep
         sub queue-buffer($buffer) {
-            my $queue  := nqp::create(ParaQueue);
+            my $queue := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
                 my $iterator := $buffer.Seq.grep($matcher).iterator;
                 nqp::until(
@@ -236,8 +232,76 @@ class ParaSeq {
             $queue
         }
 
+        # Logic for queuing a buffer for grep :k
+        sub queue-buffer-k($buffer) {
+            my int $offset = $base;
+            $base = $base + nqp::elems(nqp::decont($buffer));
+
+            my $queue := nqp::create(ParaQueue);
+            $SCHEDULER.cue: {
+                my $iterator := $buffer.Seq.grep($matcher, :k).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::push($queue,$offset + $key)
+                );
+
+                # Indicate this result queue is done
+                nqp::push($queue,IterationEnd);
+            }
+            $queue
+        }
+
+        # Logic for queuing a buffer for grep :kv
+        sub queue-buffer-kv($buffer) {
+            my int $offset = $base;
+            $base = $base + nqp::elems(nqp::decont($buffer));
+
+            my $queue := nqp::create(ParaQueue);
+            $SCHEDULER.cue: {
+                my $iterator := $buffer.Seq.grep($matcher, :kv).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::push($queue,$offset + $key),      # key
+                  nqp::push($queue,$iterator.pull-one),  # value
+                );
+
+                # Indicate this result queue is done
+                nqp::push($queue,IterationEnd);
+            }
+            $queue
+        }
+
+        # Logic for queuing a buffer for grep :p
+        sub queue-buffer-p($buffer) {
+            my int $offset = $base;
+            $base = $base + nqp::elems(nqp::decont($buffer));
+
+            my $queue := nqp::create(ParaQueue);
+            $SCHEDULER.cue: {
+                my $iterator := $buffer.Seq.grep($matcher, :kv).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::push(
+                    $queue,
+                    Pair.new($offset + $key, $iterator.pull-one)
+                  )
+                );
+
+                # Indicate this result queue is done
+                nqp::push($queue,IterationEnd);
+            }
+            $queue
+        }
+
         # Let's go!
-        self!start(&queue-buffer)
+        self!start($k
+          ?? &queue-buffer-k
+          !! $kv
+            ?? &queue-buffer-kv
+            !! $p
+              ?? &queue-buffer-p
+              !! &queue-buffer
+        )
     }
     multi method grep(ParaSeq:D: $matcher) {
 

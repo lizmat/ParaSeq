@@ -3,7 +3,10 @@ use ParaSeq;
 
 plan 28;
 
-my constant @list      = (^200000).reverse.List;
+my constant $elems = 200000;
+my constant $batch = 2000;
+
+my constant @list      = (^$elems).reverse.List;
 my constant $grep2    = @list.grep(* %% 2).List;
 #my constant $grep2e   = @list.grep(* %% 2, :end).List;
 my constant $grep2k   = @list.grep(* %% 2, :k).List;
@@ -17,52 +20,52 @@ my constant $grepm2 = @list.grep(-> $a, $b          { True }).List;
 my constant $grepm4 = @list.grep(-> $a, $b, $c, $d  { True }).List;
 
 for 1, ParaSeq.default-degree {
-    my $seq := @list.&hyperize(2000, $_).grep(* %% 2);
+    my $seq := @list.&hyperize($batch, $_).grep(* %% 2);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $grep2, "grep(* %% 2) with degree = $_";
 
-#    $seq := @list.&hyperize(2000, $_).grep(* %% 2, :end);
+#    $seq := @list.&hyperize($batch, $_).grep(* %% 2, :end);
 #    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
 #    is-deeply $seq.List, $grep2e, "grep(%% * 2, :end) with degree = $_";
 
-    $seq := @list.&hyperize(2000, $_).grep(* %% 2, :v);
+    $seq := @list.&hyperize($batch, $_).grep(* %% 2, :v);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $grep2, "grep(* %% 2, :v) with degree = $_";
 
-#    $seq := @list.&hyperize(2000, $_).grep(* %% 2, :v, :end);
+#    $seq := @list.&hyperize($batch, $_).grep(* %% 2, :v, :end);
 #    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
 #    is-deeply $seq.List, $grep2e, "grep(%% * 2, :v, :end) with degree = $_";
 
-    $seq := @list.&hyperize(2000, $_).grep(* %% 2, :k);
+    $seq := @list.&hyperize($batch, $_).grep(* %% 2, :k);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $grep2k, "grep(%% * 2, :k) with degree = $_";
 
-#    $seq := @list.&hyperize(2000, $_).grep(* %% 2, :k, :end);
+#    $seq := @list.&hyperize($batch, $_).grep(* %% 2, :k, :end);
 #    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
 #    is-deeply $seq.List, $grep2ke, "grep(%% * 2, :k, :end) with degree = $_";
 
-    $seq := @list.&hyperize(2000, $_).grep(* %% 2, :p);
+    $seq := @list.&hyperize($batch, $_).grep(* %% 2, :p);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $grep2p, "grep(%% * 2, :p) with degree = $_";
 
-#    $seq := @list.&hyperize(2000, $_).grep(* %% 2, :p, :end);
+#    $seq := @list.&hyperize($batch, $_).grep(* %% 2, :p, :end);
 #    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
 #    is-deeply $seq.List, $grep2pe, "grep(%% * 2, :p, :end) with degree = $_";
 
-    $seq := @list.&hyperize(2000, $_).grep(* %% 2, :kv);
+    $seq := @list.&hyperize($batch, $_).grep(* %% 2, :kv);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $grep2kv, "grep(%% * 2, :kv) with degree = $_";
 
-#    $seq := @list.&hyperize(2000, $_).grep(* %% 2, :kv, :end);
+#    $seq := @list.&hyperize($batch, $_).grep(* %% 2, :kv, :end);
 #    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
 #    is-deeply $seq.List, $grep2kve, "grep(%% * 2, :kv, :end) with degree = $_";
 
-    $seq := @list.&hyperize(2000, $_).grep(-> $a, $b { True });
+    $seq := @list.&hyperize($batch, $_).grep(-> $a, $b { True });
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $grepm2,
       "grep(-> \$a, \$b \{ True }) with degree = $_";
 
-    $seq := @list.&hyperize(2000, $_).grep(-> $a, $b, $c, $d { True });
+    $seq := @list.&hyperize($batch, $_).grep(-> $a, $b, $c, $d { True });
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $grepm4,
       "grep(-> \$a, \$b, \$c, \$d \{ True }) with degree = $_";
