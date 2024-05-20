@@ -52,16 +52,25 @@ my class ParaIterator does Iterator {
     has $!queues;    # other queues to produce from
     has $!pressure;  # backpressure provider
 
-    method new(\current, \pressure) {
+    method new(\pressure) {
         my $self := nqp::create(self);
-        nqp::bindattr($self,ParaIterator,'$!current',current);
-        nqp::bindattr($self,ParaIterator,'$!pressure',pressure);
+        nqp::bindattr($self,ParaIterator,'$!current',
+          nqp::list(IterationEnd, Mu)  # initial "exhausted" buffer
+        );
         nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
+        nqp::bindattr($self,ParaIterator,'$!pressure',pressure);
         $self
     }
 
-    method nr-queues()          { nqp::elems($!queues)      }
-    method add-queue(Mu \queue) { nqp::push($!queues,queue) }
+    method nr-queues()    { nqp::elems($!queues)             }
+    method close-queues() { nqp::push($!queues,IterationEnd) }
+
+    # Add a semaphore to the queue.  This is a ParaQueue to which a
+    # fully processed IterationBuffer will be pushed when it is ready.
+    # Until then, it will block if it is not ready yet
+    method semaphore() {
+        nqp::push($!queues,nqp::create(ParaQueue))
+    }
 
     method pull-one() {
         my $pulled := nqp::shift($!current);
@@ -73,7 +82,9 @@ my class ParaIterator does Iterator {
             (return IterationEnd),                         # no queue left, done
             nqp::stmts(                                    # one more queue
               nqp::push($!pressure,nqp::shift($!current)), # allow more work
-              $pulled := nqp::shift($!current := $pulled)  # set next queue
+              $pulled := nqp::shift(                       # first value of
+                $!current := nqp::shift($pulled)           # the next queue
+              )
             )
           )
         );
@@ -81,7 +92,56 @@ my class ParaIterator does Iterator {
         $pulled
     }
 
-    method push-all(\target) {
+    method skip-at-least(uint $skipping) {
+        my      $current  := $!current;
+        my      $queues   := $!queues;
+        my      $pressure := $!pressure;
+        my uint $toskip    = $skipping;
+
+        nqp::while(
+          $toskip,
+          nqp::stmts(
+            (my uint $elems = nqp::elems($current) - 2),
+            nqp::if(
+              $elems > $toskip,  # can't ignore whole buffer, only part
+              nqp::stmts(
+                ($!current := nqp::splice($current, nqp::list, 0, $toskip)),
+                (return 1)
+              )
+            ),
+            nqp::if(             # ignored whole buffer, fetch next
+              nqp::eqaddr((my $next := nqp::shift($queues)),IterationEnd),
+              (return 0)         # really done
+            ),
+            nqp::push($pressure,nqp::pop($current)),  # allow more work
+            ($toskip = $toskip - $elems),             # seen these
+            $current := nqp::shift($next)             # the next queue
+          )
+        );
+    }
+
+    proto method push-all(|) {*}
+    multi method push-all(IterationBuffer:D \target) {
+        my $current  := $!current;
+        my $queues   := $!queues;
+        my $pressure := $!pressure;
+
+        nqp::while(
+          1,
+          nqp::stmts(
+            (my $stats := nqp::pop($current)),
+            nqp::pop($current),  # IterationEnd
+            nqp::splice(target, $current, nqp::elems(target), 0);
+            nqp::if(
+              nqp::eqaddr((my $next := nqp::shift($queues)),IterationEnd),
+              (return IterationEnd)        # really done
+            ),
+            nqp::push($pressure,$stats),   # allow more work
+            $current := nqp::shift($next)  # next queue
+          )
+        );
+    }
+    multi method push-all(Mu \target) {
         my $current  := $!current;
         my $queues   := $!queues;
         my $pressure := $!pressure;
@@ -95,13 +155,15 @@ my class ParaIterator does Iterator {
               nqp::if(
                 nqp::eqaddr(($pulled := nqp::shift($queues)),IterationEnd),
                 (return IterationEnd),                        # really done
-                nqp::stmts(                                   # one more queue
+                nqp::stmts(
                   nqp::push($pressure,nqp::shift($current)),  # allow more work
-                  $pulled := nqp::shift($current := $pulled)  # set next queue
+                  $pulled := nqp::shift(                      # first value of
+                    $current := nqp::shift($pulled)           # the next queue
+                  )
                 )
               )
             ),
-            nqp::push(target, $pulled)
+            target.push: $pulled
           )
         );
     }
@@ -192,14 +254,20 @@ class ParaSeq {
 
         # Queue the first buffer we already filled, and set up the
         # result iterator
-        $!result := ParaIterator.new(queue-buffer(0, $first), $pressure);
-        $!stats  := nqp::create(IterationBuffer);
+        queue-buffer(
+          0,
+          $first,
+          ($!result := ParaIterator.new($pressure)).semaphore
+        );
+
+        # Set up place to store stats
+        $!stats := nqp::create(IterationBuffer);
 
         # Make sure the scheduling of further batches actually happen in a
         # separate thread
         $!SCHEDULER.cue: {
-            my uint $ordinal;          # ordinal number of batch
-            my uint $exhausted;        # flag: 1 if exhausted
+            my uint $ordinal;    # ordinal number of batch
+            my uint $exhausted;  # flag: 1 if exhausted
 
             # some shortcuts
             my $source := $!source;
@@ -214,7 +282,7 @@ class ParaSeq {
             # noise that is already involved in doing multi-threading
             my int $checkpoints = 3 * $degree;
             my uint @initial = (^$checkpoints).map: {
-                granulize(nqp::coerce_ni($batch * (0.5e0 + 10 * 1.rand)))
+                granulize(nqp::coerce_ni($batch * (0.5e0 + nqp::rand_n(10e0))))
             }
 
             # Initial noisifying in setting the batch size
@@ -282,13 +350,13 @@ class ParaSeq {
                 )),
                 nqp::if(         # add if something to add
                   nqp::elems($buffer),
-                  $result.add-queue(queue-buffer(++$ordinal, $buffer))
+                  queue-buffer(++$ordinal, $buffer, $result.semaphore);
                 )
               )
             );
 
             # No more result queues will come
-            $result.add-queue(IterationEnd);
+            $result.close-queues
         }
 
         # All scheduled now, so let the show begin!
@@ -306,11 +374,13 @@ class ParaSeq {
     }
 
     # Mark the given queue as done
-    method !queue-done(uint $ordinal, uint $then, $buffer, $queue) {
+    method !queue-done(
+      uint $ordinal, uint $then, $input, $semaphore, $output
+    ) {
         my uint $delta = nqp::time() - $then;
 
         # Indicate this result queue is done
-        nqp::push(nqp::decont($queue),IterationEnd);
+        nqp::push(nqp::decont($output),IterationEnd);
 
         # Values produced after IterationEnd should be ignored.
         # Use this property to tell the result iterator how much
@@ -318,13 +388,16 @@ class ParaSeq {
         # the result producer to tell the batcher it may have to
         # adapt the batch size
         nqp::push(
-          nqp::decont($queue),
+          nqp::decont($output),
           ParaStats.new(
             $ordinal,
-            nqp::elems(nqp::decont($buffer)),
+            nqp::elems(nqp::decont($input)),
             nqp::time() - $then
           )
         );
+
+        # Make the produced values available to the result iterator
+        nqp::push(nqp::decont($semaphore),nqp::decont($output));
     }
 
     # Just count the number of produced values
@@ -388,19 +461,18 @@ class ParaSeq {
 
         # Logic for queuing a buffer for map
         my $SCHEDULER := $!SCHEDULER;
-        sub queue-buffer(uint $ordinal, $buffer) {
-            my $queue := nqp::create(ParaQueue);
+        sub queue-buffer(uint $ordinal, $input, $semaphore) {
             $SCHEDULER.cue: {
-                my uint $then = nqp::time;
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IterationBuffer);
 
-                my $iterator := $buffer.Seq.map($mapper).iterator;
+                my $iterator := $input.Seq.map($mapper).iterator;
                 nqp::until(
                   nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd),
-                  nqp::push($queue,$pulled)
+                  nqp::push($output,$pulled)
                 );
-                self!queue-done($ordinal, $then, $buffer, $queue);
+                self!queue-done($ordinal, $then, $input, $semaphore, $output);
             }
-            $queue
         }
 
         # Let's go!
@@ -416,82 +488,77 @@ class ParaSeq {
         my uint $base;  # base offset for :k, :kv, :p
 
         # Logic for queuing a buffer for bare grep { }, producing values
-        sub v(uint $ordinal, $buffer) {
-            my $queue := nqp::create(ParaQueue);
+        sub v(uint $ordinal, $input, $semaphore) {
             $SCHEDULER.cue: {
-                my uint $then = nqp::time;
-
-                my $iterator := $buffer.Seq.grep($matcher).iterator;
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IterationBuffer);
+                my $iterator := $input.Seq.grep($matcher).iterator;
                 nqp::until(
                   nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd),
-                  nqp::push($queue,$pulled)
+                  nqp::push($output,$pulled)
                 );
-                self!queue-done($ordinal, $then, $buffer, $queue);
+                self!queue-done($ordinal, $then, $input, $semaphore, $output);
             }
-            $queue
         }
 
         # Logic for queuing a buffer for grep { } :k
-        sub k(uint $ordinal, $buffer) {
+        sub k(uint $ordinal, $input, $semaphore) {
             my uint $offset = $base;
-            $base = $base + nqp::elems(nqp::decont($buffer));
+            $base = $base + nqp::elems(nqp::decont($input));
 
-            my $queue := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
-                my uint $then = nqp::time;
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IterationBuffer);
 
-                my $iterator := $buffer.Seq.grep($matcher, :k).iterator;
+                my $iterator := $input.Seq.grep($matcher, :k).iterator;
                 nqp::until(
                   nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
-                  nqp::push($queue,$offset + $key)
+                  nqp::push($output,$offset + $key)
                 );
-                self!queue-done($ordinal, $then, $buffer, $queue);
+                self!queue-done($ordinal, $then, $input, $semaphore, $output);
             }
-            $queue
         }
 
         # Logic for queuing a buffer for grep { } :kv
-        sub kv(uint $ordinal, $buffer) {
+        sub kv(uint $ordinal, $input, $semaphore) {
             my uint $offset = $base;
-            $base = $base + nqp::elems(nqp::decont($buffer));
+            $base = $base + nqp::elems(nqp::decont($input));
 
-            my $queue := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
-                my uint $then = nqp::time;
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IterationBuffer);
 
-                my $iterator := $buffer.Seq.grep($matcher, :kv).iterator;
+                my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
                   nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
                   nqp::stmts(
-                    nqp::push($queue,$offset + $key),     # key
-                    nqp::push($queue,$iterator.pull-one)  # value
+                    nqp::push($output,$offset + $key),     # key
+                    nqp::push($output,$iterator.pull-one)  # value
                   )
                 );
-                self!queue-done($ordinal, $then, $buffer, $queue);
+                self!queue-done($ordinal, $then, $input, $semaphore, $output);
             }
-            $queue
         }
 
         # Logic for queuing a buffer for grep { } :p
-        sub p(uint $ordinal, $buffer) {
+        sub p(uint $ordinal, $input, $semaphore) {
             my uint $offset = $base;
-            $base = $base + nqp::elems(nqp::decont($buffer));
+            $base = $base + nqp::elems(nqp::decont($input));
 
-            my $queue := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
-                my uint $then = nqp::time;
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IterationBuffer);
 
-                my $iterator := $buffer.Seq.grep($matcher, :kv).iterator;
+                my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
                   nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
                   nqp::push(
-                    $queue,
+                    $output,
                     Pair.new($offset + $key, $iterator.pull-one)
                   )
                 );
-                self!queue-done($ordinal, $then, $buffer, $queue);
+                self!queue-done($ordinal, $then, $input, $semaphore, $output);
             }
-            $queue
         }
 
         # Let's go!
@@ -506,82 +573,78 @@ class ParaSeq {
         my uint $base;  # base offset for :k, :kv, :p
 
         # Logic for queuing a buffer for grep /.../
-        sub v(uint $ordinal, $buffer) {
-            my $queue  := nqp::create(ParaQueue);
+        sub v(uint $ordinal, $input, $semaphore) {
             $SCHEDULER.cue: {
-                my uint $then = nqp::time;
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IterationBuffer);
 
-                my $iterator := $buffer.Seq.grep($matcher).iterator;
+                my $iterator := $input.Seq.grep($matcher).iterator;
                 nqp::until(
                   nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd),
-                  nqp::push($queue,$pulled)
+                  nqp::push($output,$pulled)
                 );
-                self!queue-done($ordinal, $then, $buffer, $queue);
+                self!queue-done($ordinal, $then, $input, $semaphore, $output);
             }
-            $queue
         }
 
         # Logic for queuing a buffer for grep /.../ :k
-        sub k(uint $ordinal, $buffer) {
+        sub k(uint $ordinal, $input, $semaphore) {
             my uint $offset = $base;
-            $base = $base + nqp::elems(nqp::decont($buffer));
+            $base = $base + nqp::elems(nqp::decont($input));
 
-            my $queue := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
-                my uint $then = nqp::time;
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IterationBuffer);
 
-                my $iterator := $buffer.Seq.grep($matcher, :k).iterator;
+                my $iterator := $input.Seq.grep($matcher, :k).iterator;
                 nqp::until(
                   nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
-                  nqp::push($queue,$offset + $key)
+                  nqp::push($output,$offset + $key)
                 );
-                self!queue-done($ordinal, $then, $buffer, $queue);
+                self!queue-done($ordinal, $then, $input, $semaphore, $output);
             }
-            $queue
         }
 
         # Logic for queuing a buffer for grep /.../ :kv
-        sub kv(uint $ordinal, $buffer) {
+        sub kv(uint $ordinal, $input, $semaphore) {
             my uint $offset = $base;
-            $base = $base + nqp::elems(nqp::decont($buffer));
+            $base = $base + nqp::elems(nqp::decont($input));
 
-            my $queue := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
-                my uint $then = nqp::time;
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IterationBuffer);
 
-                my $iterator := $buffer.Seq.grep($matcher, :kv).iterator;
+                my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
                   nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
                   nqp::stmts(
-                    nqp::push($queue,$offset + $key),     # key
-                    nqp::push($queue,$iterator.pull-one)  # value
+                    nqp::push($output,$offset + $key),     # key
+                    nqp::push($output,$iterator.pull-one)  # value
                   )
                 );
-                self!queue-done($ordinal, $then, $buffer, $queue);
+                self!queue-done($ordinal, $then, $input, $semaphore, $output);
             }
-            $queue
         }
 
         # Logic for queuing a buffer for grep /.../ :p
-        sub p(uint $ordinal, $buffer) {
+        sub p(uint $ordinal, $input, $semaphore) {
             my uint $offset = $base;
-            $base = $base + nqp::elems(nqp::decont($buffer));
+            $base = $base + nqp::elems(nqp::decont($input));
 
-            my $queue := nqp::create(ParaQueue);
             $SCHEDULER.cue: {
-                my uint $then = nqp::time;
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IterationBuffer);
 
-                my $iterator := $buffer.Seq.grep($matcher, :kv).iterator;
+                my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
                   nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
                   nqp::push(
-                    $queue,
+                    $output,
                     Pair.new($offset + $key, $iterator.pull-one)
                   )
                 );
-                self!queue-done($ordinal, $then, $buffer, $queue);
+                self!queue-done($ordinal, $then, $input, $semaphore, $output);
             }
-            $queue
         }
 
         # Let's go!
