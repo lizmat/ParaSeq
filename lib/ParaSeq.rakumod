@@ -5,6 +5,13 @@ use nqp;
 my uint $default-batch  = 10;
 my uint $default-degree = Kernel.cpu-cores-but-one;
 
+# Helper sub to determine granularity of batches depending on the signature
+# of a callable
+my sub granularity(&callable) {
+    my $count := &callable.count;
+    $count == Inf ?? 1 !! $count
+}
+
 #- ParaQueue -------------------------------------------------------------------
 # A blocking concurrent queue to which one can nqp::push and from which one
 # can nqp::shift
@@ -470,8 +477,7 @@ class ParaSeq {
         }
 
         # Let's go!
-        my $count := $mapper.count;
-        self!start(&queue-buffer, $count == Inf ?? 1 !! $count)
+        self!start(&queue-buffer, granularity($mapper))
     }
 
 #- grep ------------------------------------------------------------------------
@@ -556,10 +562,9 @@ class ParaSeq {
         }
 
         # Let's go!
-        my $count := $matcher.count;
         self!start(
           $k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v,
-          $count == Inf ?? 1 !! $count
+          granularity($matcher)
         )
     }
     multi method grep(ParaSeq:D: $matcher, :$k, :$kv, :$p) {
