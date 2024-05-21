@@ -209,9 +209,30 @@ class ParaSeq {
         $self
     }
 
-    # Start the async process with the first buffer and the given buffer
-    # queuing logic and required granularity for producing values
-    method !start(&queue-buffer, uint $granularity = 1) {
+    # Start the async process with the given processor logic and the
+    # required granularity for producing values
+    method !start(&processor, uint $granularity = 1) {
+        $!source.is-lazy
+          ?? $granularity == 1
+            ?? self!batch-one-lazy(&processor)
+            !! self!batch-lazy(&processor, $granularity)
+          !! $granularity == 1
+            ?? self!batch-one(&processor)
+            !! self!batch(&processor, $granularity)
+    }
+
+    # for now
+    method !batch-one-lazy(&processor) {
+        self!batch(&processor, 1)
+    }
+    method !batch-lazy(&processor, $granularity) {
+        self!batch(&processor, $granularity)
+    }
+    method !batch-one(&processor) {
+        self!batch(&processor, 1)
+    }
+
+    method !batch(&processor, uint $granularity) {
 
         # Logic for making sure batch size has correct granularity
         my sub granulize(uint $batch) {
@@ -237,7 +258,7 @@ class ParaSeq {
 
         # Queue the first buffer we already filled, and set up the
         # result iterator
-        queue-buffer(
+        processor(
           0,
           $first,
           ($!result := ParaIterator.new($pressure)).semaphore
@@ -334,7 +355,7 @@ class ParaSeq {
                 )),
                 nqp::if(         # add if something to add
                   nqp::elems($buffer) && nqp::not_i(⚛$!stop),
-                  queue-buffer(++$ordinal, $buffer, $result.semaphore);
+                  processor(++$ordinal, $buffer, $result.semaphore);
                 )
               )
             );
@@ -448,7 +469,7 @@ class ParaSeq {
 
         # Logic for queuing a buffer for map
         my $SCHEDULER := $!SCHEDULER;
-        sub queue-buffer(uint $ordinal, $input, $semaphore) {
+        sub processor(uint $ordinal, $input, $semaphore) {
             $SCHEDULER.cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IterationBuffer);
@@ -463,7 +484,7 @@ class ParaSeq {
         }
 
         # Let's go!
-        self!start(&queue-buffer, granularity($mapper))
+        self!start(&processor, granularity($mapper))
     }
 
 #- grep ------------------------------------------------------------------------
