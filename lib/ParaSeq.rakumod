@@ -229,7 +229,125 @@ class ParaSeq {
         self!batch(&processor, $granularity)
     }
     method !batch-one(&processor) {
-        self!batch(&processor, 1)
+        # Local copy of first buffer
+        my $first := $!buffer;
+        $!buffer  := Mu;  # release buffer in object
+
+        # Set up initial back pressure queue allowing for one batch to
+        # be created for each worker thread
+        my uint $degree    = $!degree;
+        my      $pressure := nqp::create(ParaQueue);
+        nqp::push($pressure, Mu) for ^$degree;
+
+        # Queue the first buffer we already filled, and set up the
+        # result iterator
+        processor(
+          0,
+          $first,
+          ($!result := ParaIterator.new($pressure)).semaphore
+        );
+
+        # Set up place to store stats
+        $!stats := nqp::create(IterationBuffer);
+
+        # Make sure the scheduling of further batches actually happen in a
+        # separate thread
+        $!SCHEDULER.cue: {
+            my uint $ordinal;    # ordinal number of batch
+            my uint $exhausted;  # flag: 1 if exhausted
+
+            # some shortcuts
+            my $source := $!source;
+            my $result := $!result;
+            my $stats  := $!stats;
+
+            my uint $batch = $!batch;
+
+            # Set up initial batch sizes to introduce sufficient noise
+            # to make sure we won't be influenced too much by the random
+            # noise that is already involved in doing multi-threading
+            my int $checkpoints = 3 * $degree;
+            my uint @initial = (^$checkpoints).map: {
+                nqp::coerce_ni($batch * (0.5e0 + nqp::rand_n(10e0)))
+            }
+
+            # Initial noisifying in setting the batch size
+            my multi sub tweak-batch(Mu $ok) {
+                $batch = nqp::shift_i(@initial) if nqp::elems(@initial);
+            }
+
+            # Shortcut to the last N results
+            my uint @avg-nsecs;
+            my uint @batch;
+
+            # Logic for tweaking the batch size by looking at the last N
+            # stats that have been collected.  If enough stats collected
+            # then zero in on the batch size with the lowest average nsecs
+            my multi sub tweak-batch(ParaStats:D $ok) {
+                my uint $lowest = $ok.average-nsecs;
+
+                # Still some initially fuzzed batch sizes
+                if nqp::elems(@initial) {
+                    $batch = nqp::shift_i(@initial);
+                }
+
+                # No more fuzzed, need to calculate
+                else {
+                    my uint $new = $ok.processed;
+                    my uint $m   = nqp::elems(@avg-nsecs);
+                    my  int $i   = -1;
+                    nqp::while(
+                      ++$i < $m,
+                      nqp::if(
+                        nqp::isle_i(nqp::atpos_i(@avg-nsecs,$i),$lowest),
+                        nqp::stmts(
+                          ($lowest = nqp::atpos_i(@avg-nsecs,$i)),
+                          ($new    = nqp::atpos_i(@batch,$i))
+                        )
+                      )
+                    );
+
+                    # Remove oldest
+                    nqp::shift_i(@avg-nsecs);
+                    nqp::shift_i(@batch);
+
+                    # Set new batch size with a higher tendency
+                    $batch = nqp::coerce_ni($new * 1.2e0);
+#say "processed = $ok.processed(), produced = $ok.produced(), nsecs = $ok.nsecs(), batch = $batch";
+                }
+
+                # Now update the lists of stats
+                nqp::push_i(@avg-nsecs, $lowest);
+                nqp::push_i(@batch,     $ok.processed);
+                nqp::push($stats, $ok);
+            }
+
+            # Until we're halted or have a buffer that's not full
+            nqp::until(
+              nqp::atomicload_i($!stop)  # complete shutdown requested
+                || $exhausted,           # nothing left to batch
+              nqp::stmts(
+                tweak-batch(nqp::shift($pressure)), # wait for ok to proceed
+                ($exhausted = nqp::eqaddr(
+                  $source.push-exactly(
+                    (my $buffer := nqp::create(IterationBuffer)),
+                    $batch
+                  ),
+                  IterationEnd
+                )),
+                nqp::if(         # add if something to add
+                  nqp::elems($buffer) && nqp::not_i(nqp::atomicload_i($!stop)),
+                  processor(++$ordinal, $buffer, $result.semaphore);
+                )
+              )
+            );
+
+            # No more result queues will come
+            $result.close-queues
+        }
+
+        # All scheduled now, so let the show begin!
+        self
     }
 
     method !batch(&processor, uint $granularity) {
@@ -342,8 +460,8 @@ class ParaSeq {
 
             # Until we're halted or have a buffer that's not full
             nqp::until(
-              ⚛$!stop            # complete shutdown requested
-                || $exhausted,   # nothing left to batch
+              nqp::atomicload_i($!stop)  # complete shutdown requested
+                || $exhausted,           # nothing left to batch
               nqp::stmts(
                 tweak-batch(nqp::shift($pressure)), # wait for ok to proceed
                 ($exhausted = nqp::eqaddr(
@@ -354,7 +472,7 @@ class ParaSeq {
                   IterationEnd
                 )),
                 nqp::if(         # add if something to add
-                  nqp::elems($buffer) && nqp::not_i(⚛$!stop),
+                  nqp::elems($buffer) && nqp::not_i(nqp::atomicload_i($!stop)),
                   processor(++$ordinal, $buffer, $result.semaphore);
                 )
               )
@@ -381,33 +499,33 @@ class ParaSeq {
     method !add-stats(
       uint $ordinal, uint $processed, uint $produced, uint $nsecs
     ) {
-        $!processed ⚛+= $processed;
-        $!produced  ⚛+= $produced;
-        $!nsecs     ⚛+= $nsecs;
+        nqp::atomicadd_i($!processed,$processed);
+        nqp::atomicadd_i($!produced, $produced );
+        nqp::atomicadd_i($!nsecs,    $nsecs    );
         ParaStats.new($ordinal, $processed, $produced, $nsecs)
     }
 
     # Mark the given queue as done
-    method !queue-done(
+    method !batch-done(
       uint $ordinal, uint $then, $input, $semaphore, $output
     ) {
-        # Values produced after IterationEnd should be ignored.
-        # Use this property to tell the result iterator how much
-        # time it took to produce these, which in turn will allow
-        # the result producer to tell the batcher it may have to
-        # adapt the batch size
-        nqp::push(
-          nqp::decont($output),
-          self!add-stats(
-            $ordinal,
-            nqp::elems(nqp::decont($input)),
-            nqp::elems(nqp::decont($output)),
-            nqp::time() - $then
-          )
-        );
 
-        # Make the produced values available to the result iterator
-        nqp::push(nqp::decont($semaphore),nqp::decont($output));
+        # If we're still running
+        unless nqp::atomicload_i($!stop) {
+            # Push the statistics as the last element in the output
+            nqp::push(
+              nqp::decont($output),
+              self!add-stats(
+                $ordinal,
+                nqp::elems(nqp::decont($input)),
+                nqp::elems(nqp::decont($output)),
+                nqp::time() - $then
+              )
+            );
+
+            # Make the produced values available to the result iterator
+            nqp::push(nqp::decont($semaphore),nqp::decont($output));
+        }
     }
 
     # Just count the number of produced values
@@ -449,7 +567,7 @@ class ParaSeq {
           !! $!source
     }
 
-    method stop(ParaSeq:D:) { $!stop ⚛= 1 }
+    method stop(ParaSeq:D:) { nqp::atomicstore_i($!stop,1) }
 
 #- introspection ---------------------------------------------------------------
 
@@ -460,7 +578,7 @@ class ParaSeq {
     method batch( ParaSeq:D:) { $!batch      }
     method stats( ParaSeq:D:) { $!stats.List }
 
-    method stopped(ParaSeq:D:) { nqp::hllbool(⚛$!stop) }
+    method stopped(ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
 
 #- map -------------------------------------------------------------------------
 
@@ -476,10 +594,11 @@ class ParaSeq {
 
                 my $iterator := $input.Seq.map($mapper).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd),
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd)
+                    || nqp::atomicload_i($!stop),
                   nqp::push($output,$pulled)
                 );
-                self!queue-done($ordinal, $then, $input, $semaphore, $output);
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
@@ -501,10 +620,11 @@ class ParaSeq {
                 my      $output := nqp::create(IterationBuffer);
                 my $iterator := $input.Seq.grep($matcher).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd),
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd)
+                    || nqp::atomicload_i($!stop),
                   nqp::push($output,$pulled)
                 );
-                self!queue-done($ordinal, $then, $input, $semaphore, $output);
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
@@ -519,10 +639,11 @@ class ParaSeq {
 
                 my $iterator := $input.Seq.grep($matcher, :k).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                    || nqp::atomicload_i($!stop),
                   nqp::push($output,$offset + $key)
                 );
-                self!queue-done($ordinal, $then, $input, $semaphore, $output);
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
@@ -537,13 +658,14 @@ class ParaSeq {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                    || nqp::atomicload_i($!stop),
                   nqp::stmts(
                     nqp::push($output,$offset + $key),     # key
                     nqp::push($output,$iterator.pull-one)  # value
                   )
                 );
-                self!queue-done($ordinal, $then, $input, $semaphore, $output);
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
@@ -558,13 +680,14 @@ class ParaSeq {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                    || nqp::atomicload_i($!stop),
                   nqp::push(
                     $output,
                     Pair.new($offset + $key, $iterator.pull-one)
                   )
                 );
-                self!queue-done($ordinal, $then, $input, $semaphore, $output);
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
@@ -586,10 +709,11 @@ class ParaSeq {
 
                 my $iterator := $input.Seq.grep($matcher).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd),
-                  nqp::push($output,$pulled)
+                  nqp::eqaddr((my $value := $iterator.pull-one),IterationEnd)
+                    || nqp::atomicload_i($!stop),
+                  nqp::push($output,$value)
                 );
-                self!queue-done($ordinal, $then, $input, $semaphore, $output);
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
@@ -604,10 +728,11 @@ class ParaSeq {
 
                 my $iterator := $input.Seq.grep($matcher, :k).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                    || nqp::atomicload_i($!stop),
                   nqp::push($output,$offset + $key)
                 );
-                self!queue-done($ordinal, $then, $input, $semaphore, $output);
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
@@ -622,13 +747,14 @@ class ParaSeq {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                    || nqp::atomicload_i($!stop),
                   nqp::stmts(
                     nqp::push($output,$offset + $key),     # key
                     nqp::push($output,$iterator.pull-one)  # value
                   )
                 );
-                self!queue-done($ordinal, $then, $input, $semaphore, $output);
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
@@ -643,13 +769,14 @@ class ParaSeq {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                    || nqp::atomicload_i($!stop),
                   nqp::push(
                     $output,
                     Pair.new($offset + $key, $iterator.pull-one)
                   )
                 );
-                self!queue-done($ordinal, $then, $input, $semaphore, $output);
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
