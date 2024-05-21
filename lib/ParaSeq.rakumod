@@ -61,7 +61,8 @@ my class ParaIterator does Iterator {
 
     method new(\pressure) {
         my $self := nqp::create(self);
-        nqp::bindattr($self,ParaIterator,'$!current',nqp::list(Mu));
+        nqp::push((my $current := nqp::create(IterationBuffer)),Mu);
+        nqp::bindattr($self,ParaIterator,'$!current',$current);
         nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
         nqp::bindattr($self,ParaIterator,'$!pressure',pressure);
         $self
@@ -125,8 +126,7 @@ my class ParaIterator does Iterator {
         );
     }
 
-    proto method push-all(|) {*}
-    multi method push-all(IterationBuffer:D \target) {
+    method push-all(\target) {
         my $current  := $!current;
         my $queues   := $!queues;
         my $pressure := $!pressure;
@@ -135,39 +135,13 @@ my class ParaIterator does Iterator {
           1,
           nqp::stmts(
             (my $stats := nqp::pop($current)),
-            nqp::splice(target, $current, nqp::elems(target), 0);
+            target.append($current),
             nqp::if(
               nqp::eqaddr((my $next := nqp::shift($queues)),IterationEnd),
               (return IterationEnd)        # really done
             ),
             nqp::push($pressure,$stats),   # allow more work
             $current := nqp::shift($next)  # next queue
-          )
-        );
-    }
-    multi method push-all(Mu \target) {
-        my $current  := $!current;
-        my $queues   := $!queues;
-        my $pressure := $!pressure;
-
-        nqp::while(
-          1,
-          nqp::stmts(
-            (my $pulled := nqp::shift($current)),
-            nqp::while(
-              nqp::not_i(nqp::elems($current)),    # queue exhausted
-              nqp::if(
-                nqp::eqaddr((my $next := nqp::shift($queues)),IterationEnd),
-                (return IterationEnd),             # really done
-                nqp::stmts(
-                  nqp::push($pressure,$pulled),    # allow more work
-                  $pulled := nqp::shift(           # first value of
-                    $current := nqp::shift($next)  # the next queue
-                  )
-                )
-              )
-            ),
-            target.push: $pulled
           )
         );
     }
@@ -179,35 +153,40 @@ my class ParaIterator does Iterator {
 
 class ParaStats {
     has uint $.ordinal;
-    has uint $.batch;
+    has uint $.processed;
+    has uint $.produced;
     has uint $.nsecs;
 
-    method new(uint $ordinal, uint $batch, uint $nsecs) {
+    method new(uint $ordinal, uint $processed, uint $produced, uint $nsecs) {
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaStats, '$!ordinal',$ordinal);
-        nqp::bindattr_i($self, ParaStats, '$!batch',  $batch  );
-        nqp::bindattr_i($self, ParaStats, '$!nsecs',  $nsecs  );
+        nqp::bindattr_i($self, ParaStats, '$!ordinal',   $ordinal  );
+        nqp::bindattr_i($self, ParaStats, '$!processed', $processed);
+        nqp::bindattr_i($self, ParaStats, '$!produced',  $produced );
+        nqp::bindattr_i($self, ParaStats, '$!nsecs',     $nsecs    );
         $self
     }
 
-    method average-nsecs(ParaStats:D:) { $!nsecs div $!batch }
+    method average-nsecs(ParaStats:D:) { $!nsecs div $!processed }
 
     multi method gist(ParaStats:D:) {
-        "#$!ordinal: $!batch (" ~  $!nsecs div $!batch ~ " nsecs)"
+        "#$!ordinal: $!processed / $!produced ($!nsecs nsecs)"
     }
 }
 
 #- ParaSeq ---------------------------------------------------------------------
 # The class containing all of the logic for parallel sequences
 class ParaSeq {
-    has      $!buffer;     # first buffer
-    has      $!source;     # iterator producing source values
-    has      $!result;     # iterator producing result values
-    has      $!stats;      # list with ParaStats objects
-    has      $!SCHEDULER;  # $*SCHEDULER to be used
-    has uint $.degree;     # number of CPUs, must be > 1
-    has uint $.batch;      # initial batch size, must be > 0
-    has uint $!stop;       # stop all processing if 1
+    has           $!buffer;     # first buffer
+    has           $!source;     # iterator producing source values
+    has           $!result;     # iterator producing result values
+    has           $!stats;      # list with ParaStats objects
+    has           $!SCHEDULER;  # $*SCHEDULER to be used
+    has uint      $.degree;     # number of CPUs, must be > 1
+    has uint      $.batch;      # initial batch size, must be > 0
+    has atomicint $!stop;       # stop all processing if 1
+    has atomicint $.processed;  # number of items processed
+    has atomicint $.produced;   # number of items produced
+    has atomicint $.nsecs;      # nano seconds wallclock used
 
 #- private helper methods ------------------------------------------------------
 
@@ -311,7 +290,7 @@ class ParaSeq {
 
                 # No more fuzzed, need to calculate
                 else {
-                    my uint $new = $ok.batch;
+                    my uint $new = $ok.processed;
                     my uint $m   = nqp::elems(@avg-nsecs);
                     my  int $i   = -1;
                     nqp::while(
@@ -331,17 +310,18 @@ class ParaSeq {
 
                     # Set new batch size with a higher tendency
                     $batch = granulize(nqp::coerce_ni($new * 1.2e0));
+#say "processed = $ok.processed(), produced = $ok.produced(), nsecs = $ok.nsecs(), batch = $batch";
                 }
 
                 # Now update the lists of stats
                 nqp::push_i(@avg-nsecs, $lowest);
-                nqp::push_i(@batch,     $ok.batch);
+                nqp::push_i(@batch,     $ok.processed);
                 nqp::push($stats, $ok);
             }
 
             # Until we're halted or have a buffer that's not full
             nqp::until(
-              $!stop             # complete shutdown requested
+              ⚛$!stop            # complete shutdown requested
                 || $exhausted,   # nothing left to batch
               nqp::stmts(
                 tweak-batch(nqp::shift($pressure)), # wait for ok to proceed
@@ -353,7 +333,7 @@ class ParaSeq {
                   IterationEnd
                 )),
                 nqp::if(         # add if something to add
-                  nqp::elems($buffer),
+                  nqp::elems($buffer) && nqp::not_i(⚛$!stop),
                   queue-buffer(++$ordinal, $buffer, $result.semaphore);
                 )
               )
@@ -377,12 +357,19 @@ class ParaSeq {
         $self
     }
 
+    method !add-stats(
+      uint $ordinal, uint $processed, uint $produced, uint $nsecs
+    ) {
+        $!processed ⚛+= $processed;
+        $!produced  ⚛+= $produced;
+        $!nsecs     ⚛+= $nsecs;
+        ParaStats.new($ordinal, $processed, $produced, $nsecs)
+    }
+
     # Mark the given queue as done
     method !queue-done(
       uint $ordinal, uint $then, $input, $semaphore, $output
     ) {
-        my uint $delta = nqp::time() - $then;
-
         # Values produced after IterationEnd should be ignored.
         # Use this property to tell the result iterator how much
         # time it took to produce these, which in turn will allow
@@ -390,9 +377,10 @@ class ParaSeq {
         # adapt the batch size
         nqp::push(
           nqp::decont($output),
-          ParaStats.new(
+          self!add-stats(
             $ordinal,
             nqp::elems(nqp::decont($input)),
+            nqp::elems(nqp::decont($output)),
             nqp::time() - $then
           )
         );
@@ -440,6 +428,8 @@ class ParaSeq {
           !! $!source
     }
 
+    method stop(ParaSeq:D:) { $!stop ⚛= 1 }
+
 #- introspection ---------------------------------------------------------------
 
     method default-degree() { $default-degree }
@@ -449,11 +439,7 @@ class ParaSeq {
     method batch( ParaSeq:D:) { $!batch      }
     method stats( ParaSeq:D:) { $!stats.List }
 
-    method stopped(ParaSeq:D:) { nqp::hllbool($!stop) }
-
-    method average-nsecs(ParaSeq:D:) {
-        $!stats.List.map(*.average-nsecs).sum div $!stats.elems
-    }
+    method stopped(ParaSeq:D:) { nqp::hllbool(⚛$!stop) }
 
 #- map -------------------------------------------------------------------------
 
@@ -711,7 +697,7 @@ class ParaSeq {
           !! self!count - 1
     }
 
-    multi method head(   ParaSeq:D:) { self.Seq.head  }
+    multi method head(   ParaSeq:D:) { self.stop; self.Seq.head  }
     multi method tail(   ParaSeq:D:) { self.Seq.tail  }
     multi method is-lazy(ParaSeq:D:) { $!source.is-lazy }
 
