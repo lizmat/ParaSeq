@@ -81,8 +81,8 @@ my class ParaIterator does Iterator {
     method pull-one() {
         my $pulled := nqp::shift($!current);
 
-        nqp::while(
-          nqp::not_i(nqp::elems($!current)),    # queue exhausted
+        nqp::until(
+          nqp::elems($!current),                # queue exhausted
           nqp::if(
             nqp::eqaddr((my $next := nqp::shift($!queues)),IterationEnd),
             (return IterationEnd),              # no queue left, done
