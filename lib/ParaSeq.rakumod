@@ -54,9 +54,7 @@ my class ParaIterator does Iterator {
 
     method new(\pressure) {
         my $self := nqp::create(self);
-        nqp::bindattr($self,ParaIterator,'$!current',
-          nqp::list(IterationEnd, Mu)  # initial "exhausted" buffer
-        );
+        nqp::bindattr($self,ParaIterator,'$!current',nqp::list(Mu));
         nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
         nqp::bindattr($self,ParaIterator,'$!pressure',pressure);
         $self
@@ -76,14 +74,14 @@ my class ParaIterator does Iterator {
         my $pulled := nqp::shift($!current);
 
         nqp::while(
-          nqp::eqaddr($pulled,IterationEnd),               # queue exhausted
+          nqp::not_i(nqp::elems($!current)),    # queue exhausted
           nqp::if(
-            nqp::eqaddr(($pulled := nqp::shift($!queues)),IterationEnd),
-            (return IterationEnd),                         # no queue left, done
-            nqp::stmts(                                    # one more queue
-              nqp::push($!pressure,nqp::shift($!current)), # allow more work
-              $pulled := nqp::shift(                       # first value of
-                $!current := nqp::shift($pulled)           # the next queue
+            nqp::eqaddr((my $next := nqp::shift($!queues)),IterationEnd),
+            (return IterationEnd),              # no queue left, done
+            nqp::stmts(                         # one more queue
+              nqp::push($!pressure,$pulled),    # allow more work
+              $pulled := nqp::shift(            # first value of
+                $!current := nqp::shift($next)  # the next queue
               )
             )
           )
@@ -101,7 +99,7 @@ my class ParaIterator does Iterator {
         nqp::while(
           $toskip,
           nqp::stmts(
-            (my uint $elems = nqp::elems($current) - 2),
+            (my uint $elems = nqp::elems($current) - 1),
             nqp::if(
               $elems > $toskip,  # can't ignore whole buffer, only part
               nqp::stmts(
@@ -130,7 +128,6 @@ my class ParaIterator does Iterator {
           1,
           nqp::stmts(
             (my $stats := nqp::pop($current)),
-            nqp::pop($current),  # IterationEnd
             nqp::splice(target, $current, nqp::elems(target), 0);
             nqp::if(
               nqp::eqaddr((my $next := nqp::shift($queues)),IterationEnd),
@@ -151,14 +148,14 @@ my class ParaIterator does Iterator {
           nqp::stmts(
             (my $pulled := nqp::shift($current)),
             nqp::while(
-              nqp::eqaddr($pulled,IterationEnd),              # queue exhausted
+              nqp::not_i(nqp::elems($current)),    # queue exhausted
               nqp::if(
-                nqp::eqaddr(($pulled := nqp::shift($queues)),IterationEnd),
-                (return IterationEnd),                        # really done
+                nqp::eqaddr((my $next := nqp::shift($queues)),IterationEnd),
+                (return IterationEnd),             # really done
                 nqp::stmts(
-                  nqp::push($pressure,nqp::shift($current)),  # allow more work
-                  $pulled := nqp::shift(                      # first value of
-                    $current := nqp::shift($pulled)           # the next queue
+                  nqp::push($pressure,$pulled),    # allow more work
+                  $pulled := nqp::shift(           # first value of
+                    $current := nqp::shift($next)  # the next queue
                   )
                 )
               )
@@ -378,9 +375,6 @@ class ParaSeq {
       uint $ordinal, uint $then, $input, $semaphore, $output
     ) {
         my uint $delta = nqp::time() - $then;
-
-        # Indicate this result queue is done
-        nqp::push(nqp::decont($output),IterationEnd);
 
         # Values produced after IterationEnd should be ignored.
         # Use this property to tell the result iterator how much
