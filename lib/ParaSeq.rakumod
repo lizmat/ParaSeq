@@ -91,12 +91,14 @@ my class ParaIterator does Iterator {
     }
 
     method !next-batch(\next) {
-        nqp::push($!pressure,Mu);  # initiate more work
-
         $!delivered = nqp::add_i(
           $!delivered,
           nqp::elems(my $buffer := nqp::shift(next))
         );
+
+#say "delivered $!delivered, produced $!parent.produced()";
+        nqp::push($!pressure,Mu);  # initiate more work
+
         $buffer
     }
 
@@ -196,7 +198,7 @@ class ParaStats {
 
 #- ParaSeq ---------------------------------------------------------------------
 # The class containing all of the logic for parallel sequences
-class ParaSeq {
+class ParaSeq does Sequence {
     has           $!buffer;     # first buffer
     has           $!source;     # iterator producing source values
     has           $!result;     # iterator producing result values
@@ -582,7 +584,7 @@ class ParaSeq {
     # filled asynchronously.  If there is no result iterator, then the
     # source iterator be recreated using the initial buffer if there is
     # one.  Otherwise
-    multi method iterator(ParaSeq:D:) {
+    method iterator(ParaSeq:D:) {
         $!result //= nqp::istype($!buffer,IterationBuffer)
           ?? BufferIterator.new($!buffer, $!source)
           !! $!source
