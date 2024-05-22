@@ -55,12 +55,15 @@ my class BufferIterator does Iterator {
 # and removed in a thread-safe manner
 
 my class ParaIterator does Iterator {
-    has $!current;   # current producer
-    has $!queues;    # other queues to produce from
-    has $!pressure;  # backpressure provider
+    has           $!parent;    # ParaSeq parent object
+    has           $!current;   # current producer
+    has           $!queues;    # other queues to produce from
+    has           $!pressure;  # backpressure provider
+    has atomicint $!stop;      # stop all processing if 1
 
-    method new(\pressure) {
+    method new(\parent, \pressure) {
         my $self := nqp::create(self);
+        nqp::bindattr($self,ParaIterator,'$!parent',parent);
         nqp::push((my $current := nqp::create(IterationBuffer)),Mu);
         nqp::bindattr($self,ParaIterator,'$!current',$current);
         nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
@@ -68,12 +71,18 @@ my class ParaIterator does Iterator {
         $self
     }
 
-    method nr-queues()    { nqp::elems($!queues)             }
-    method close-queues() { nqp::push($!queues,IterationEnd) }
+    method close-queues(ParaIterator:D:) { nqp::push($!queues,IterationEnd) }
+
+    method stop(ParaIterator:D:) {
+        nqp::atomicstore_i($!stop,1);  # stop producing here
+        $!parent.stop;                 # stop all threads
+    }
 
     # Add a semaphore to the queue.  This is a ParaQueue to which a
     # fully processed IterationBuffer will be pushed when it is ready.
-    # Until then, it will block if it is not ready yet
+    # Until then, it will block if it is not ready yet.  As such, the
+    # associated nqp::shift acts both as a semaphore as well as the
+    # IterationBuffer with values
     method semaphore() {
         nqp::push($!queues,nqp::create(ParaQueue))
     }
@@ -95,7 +104,7 @@ my class ParaIterator does Iterator {
           )
         );
 
-        $pulled
+        nqp::atomicload_i($!stop) ?? IterationEnd !! $pulled
     }
 
     method skip-at-least(uint $skipping) {
@@ -104,8 +113,8 @@ my class ParaIterator does Iterator {
         my      $pressure := $!pressure;
         my uint $toskip    = $skipping;
 
-        nqp::while(
-          $toskip,
+        nqp::until(
+          nqp::atomicload_i($!stop),
           nqp::stmts(
             (my uint $elems = nqp::elems($current) - 1),
             nqp::if(
@@ -124,6 +133,8 @@ my class ParaIterator does Iterator {
             $current := nqp::shift($next)             # the next queue
           )
         );
+
+        0  # really done, because stopped
     }
 
     method push-all(\target) {
@@ -131,8 +142,8 @@ my class ParaIterator does Iterator {
         my $queues   := $!queues;
         my $pressure := $!pressure;
 
-        nqp::while(
-          1,
+        nqp::until(
+          nqp::atomicload_i($!stop),
           nqp::stmts(
             (my $stats := nqp::pop($current)),
             target.append($current),
@@ -144,6 +155,8 @@ my class ParaIterator does Iterator {
             $current := nqp::shift($next)  # next queue
           )
         );
+
+        IterationEnd  # really done, because stopped
     }
 }
 
@@ -244,7 +257,7 @@ class ParaSeq {
         processor(
           0,
           $first,
-          ($!result := ParaIterator.new($pressure)).semaphore
+          ($!result := ParaIterator.new(self, $pressure)).semaphore
         );
 
         # Set up place to store stats
@@ -379,7 +392,7 @@ class ParaSeq {
         processor(
           0,
           $first,
-          ($!result := ParaIterator.new($pressure)).semaphore
+          ($!result := ParaIterator.new(self, $pressure)).semaphore
         );
 
         # Set up place to store stats
@@ -567,7 +580,10 @@ class ParaSeq {
           !! $!source
     }
 
-    method stop(ParaSeq:D:) { nqp::atomicstore_i($!stop,1) }
+    method stop(ParaSeq:D:) {
+        nqp::atomicstore_i($!stop,1);
+        $!source.stop if nqp::istype($!source,ParaIterator);
+    }
 
 #- introspection ---------------------------------------------------------------
 
@@ -845,13 +861,15 @@ class ParaSeq {
           !! self!count - 1
     }
 
-    multi method head(   ParaSeq:D:) { self.stop; self.Seq.head  }
+    multi method head(ParaSeq:D:) {
+        my $value := self.iterator.pull-one;
+        self.stop;
+        $value
+    }
     multi method tail(   ParaSeq:D:) { self.Seq.tail  }
     multi method is-lazy(ParaSeq:D:) { $!source.is-lazy }
 
-
 #- coercers --------------------------------------------------------------------
-
 
     multi method IterationBuffer(ParaSeq:D:) {
         self.iterator.push-all(my $buffer := nqp::create(IterationBuffer));
