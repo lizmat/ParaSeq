@@ -4,7 +4,7 @@ use ParaSeq;
 plan 12;
 
 my constant $elems = 200000;
-my constant $batch = 2000;
+my constant $batch = 16;
 
 my constant @list   = (^$elems).reverse.List;
 my constant $map2   = @list.map(* * 2).List;

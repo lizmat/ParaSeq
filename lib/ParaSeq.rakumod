@@ -2,8 +2,9 @@
 # Rakudo core
 use nqp;
 
-my uint $default-batch  = 10;
+my uint $default-batch  = 16;
 my uint $default-degree = Kernel.cpu-cores-but-one;
+my uint $target-nsecs   = 500_000;  # .0005 second
 
 # Helper sub to determine granularity of batches depending on the signature
 # of a callable
@@ -69,20 +70,24 @@ my class ParaIterator does Iterator {
     has           $!current;    # current producer
     has ParaQueue $!queues;     # other queues to produce from
     has ParaQueue $!pressure;   # backpressure provider
-    has IB        $.stats;      # list with ParaStats objects
-    has uint      $.delivered;  # number of values that can be delivered
-    has uint      $.processed;  # number of items processed
-    has uint      $.produced;   # number of items produced
-    has uint      $.nsecs;      # nano seconds wallclock used
+    has ParaQueue $.waiting;    # queue with unprocessed ParaStats objects
+    has IB        $.stats;      # list with processed ParaStats objects
+    has uint      $.batch;      # initial / current batch size
+    has uint      $.processed;  # number of items processed seen so far
+    has uint      $.produced;   # number of items produced seen so far
+    has uint      $.nsecs;      # nano seconds wallclock used so far
     has atomicint $!stop;       # stop all processing if 1
 
-    method new(\parent, \pressure) {
+    method new(\parent, \pressure, uint $batch) {
         my $self := nqp::create(self);
         nqp::bindattr($self,ParaIterator,'$!parent',parent);
         nqp::bindattr($self,ParaIterator,'$!current',emptyIB);  # first fetch
         nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
         nqp::bindattr($self,ParaIterator,'$!pressure',pressure);
+        nqp::bindattr($self,ParaIterator,'$!waiting',nqp::create(ParaQueue));
         nqp::bindattr($self,ParaIterator,'$!stats',nqp::create(IB));
+
+        nqp::bindattr_i($self,ParaIterator,'$!batch',$batch);
         $self
     }
 
@@ -97,26 +102,51 @@ my class ParaIterator does Iterator {
     # fully processed IterationnBuffer will be pushed when it is ready.
     # Until then, it will block if it is not ready yet.  As such, the
     # associated nqp::shift acts both as a semaphore as well as the
-    # IterationnBuffer with values
+    # IterationBuffer with values
     method semaphore() {
         nqp::push($!queues,nqp::create(ParaQueue))
     }
 
     # Thread-safely handle next batch
     method !next-batch(\next) {
-        my $buffer := nqp::shift(next);
 
-        # Update statistics
-        nqp::push($!stats,my $stats := nqp::pop($buffer));
-        $!processed = nqp::add_i($!processed,$stats.processed   );
-        $!produced  = nqp::add_i($!produced, $stats.produced    );
-        $!nsecs     = nqp::add_i($!nsecs,    $stats.nsecs       );
-        $!delivered = nqp::add_i($!delivered,nqp::elems($buffer));
+        # Nothing else ready to be delivered
+        if nqp::isnull(nqp::atpos($!waiting,0)) {
 
-#say "delivered $!delivered, produced $!produced";
-        nqp::push($!pressure,2048);  # initiate more work
+            # Initiate more work using last batch value calculated
+            nqp::push($!pressure,$!batch);
+        }
 
-        $buffer
+        # At least one further batch ready to be delivered
+        else {
+
+            # Fetch statistics of batches that have been produced until now
+            my uint $processed = $!processed;
+            my uint $produced  = $!produced;
+            my uint $nsecs     = $!nsecs;
+            nqp::until(
+              nqp::isnull(nqp::atpos($!waiting,0)),
+              nqp::stmts(
+                nqp::push($!stats,my $stats := nqp::shift($!waiting)),
+                ($processed = nqp::add_i($processed,$stats.processed)),
+                ($produced  = nqp::add_i($produced, $stats.produced )),
+                ($nsecs     = nqp::add_i($nsecs,    $stats.nsecs    ))
+              )
+            );
+
+            # Update total statistics
+            $!processed = $processed;
+            $!produced  = $produced;
+            $!nsecs     = $nsecs;
+
+            nqp::push(  # initiate more work with updated batch size
+              $!pressure,
+              $!batch = nqp::div_i(nqp::mul_i($processed,$target-nsecs),$nsecs)
+            );
+        }
+
+        # Next buffer to be processed
+        nqp::shift(next)
     }
 
     method pull-one() {
@@ -191,6 +221,7 @@ my class ParaIterator does Iterator {
 # from a batch of values
 
 class ParaStats {
+    has uint $.threadid;
     has uint $.ordinal;
     has uint $.processed;
     has uint $.produced;
@@ -198,6 +229,10 @@ class ParaStats {
 
     method new(uint $ordinal, uint $processed, uint $produced, uint $nsecs) {
         my $self := nqp::create(self);
+        nqp::bindattr_i($self, ParaStats, '$!threadid',
+          nqp::threadid(nqp::currentthread)
+        );
+
         nqp::bindattr_i($self, ParaStats, '$!ordinal',   $ordinal  );
         nqp::bindattr_i($self, ParaStats, '$!processed', $processed);
         nqp::bindattr_i($self, ParaStats, '$!produced',  $produced );
@@ -208,7 +243,7 @@ class ParaStats {
     method average-nsecs(ParaStats:D:) { $!nsecs div $!processed }
 
     multi method gist(ParaStats:D:) {
-        "#$!ordinal: $!processed / $!produced ($!nsecs nsecs)"
+        "#$!threadid - $!ordinal: $!processed / $!produced ($!nsecs nsecs)"
     }
 }
 
@@ -221,6 +256,7 @@ class ParaSeq does Sequence {
     has           $!SCHEDULER;  # $*SCHEDULER to be used
     has uint      $.degree;     # number of CPUs, must be > 1
     has uint      $.batch;      # initial batch size, must be > 0
+    has atomicint $.discarded;  # produced values discarded because of stop
     has atomicint $!stop;       # stop all processing if 1
 
 #- private helper methods ------------------------------------------------------
@@ -247,86 +283,16 @@ class ParaSeq does Sequence {
     # Start the async process with the given processor logic and the
     # required granularity for producing values
     method !start(&processor, uint $granularity = 1) {
-        $!source.is-lazy
-          ?? $granularity == 1
-            ?? self!batch-one-lazy(&processor)
-            !! self!batch-lazy(&processor, $granularity)
-          !! $granularity == 1
-            ?? self!batch-one(&processor)
-            !! self!batch(&processor, $granularity)
-    }
-
-    # for now
-    method !batch-one-lazy(&processor) {
-        self!batch(&processor, 1)
-    }
-    method !batch-lazy(&processor, $granularity) {
-        self!batch(&processor, $granularity)
-    }
-    method !batch-one(&processor) {
-        # Local copy of first buffer
-        my $first := $!buffer;
-        $!buffer  := Mu;  # release buffer in object
-
-        # Set up initial back pressure queue allowing for one batch to
-        # be created for each worker thread
-        my uint $degree    = $!degree;
-        my      $pressure := nqp::create(ParaQueue);
-        nqp::push($pressure, 2048) for ^$degree;
-
-        # Queue the first buffer we already filled, and set up the
-        # result iterator
-        processor(
-          0,
-          $first,
-          ($!result := ParaIterator.new(self, $pressure)).semaphore
-        );
-
-        # Make sure the scheduling of further batches actually happen in a
-        # separate thread
-        $!SCHEDULER.cue: {
-            my uint $ordinal;    # ordinal number of batch
-            my uint $exhausted;  # flag: 1 if exhausted
-
-            # some shortcuts
-            my $source := $!source;
-            my $result := $!result;
-
-            # Until we're halted or have a buffer that's not full
-            nqp::until(
-              nqp::atomicload_i($!stop)  # complete shutdown requested
-                || $exhausted,           # nothing left to batch
-              nqp::stmts(
-                ($exhausted = nqp::eqaddr(
-                  $source.push-exactly(
-                    (my $buffer := nqp::create(IB)),
-                    nqp::shift($pressure)  # wait for ok to proceed
-                  ),
-                  IterationEnd
-                )),
-                nqp::if(         # add if something to add
-                  nqp::elems($buffer) && nqp::not_i(nqp::atomicload_i($!stop)),
-                  processor(++$ordinal, $buffer, $result.semaphore);
-                )
-              )
-            );
-
-            # No more result queues will come
-            $result.close-queues
-        }
-
-        # All scheduled now, so let the show begin!
-        self
-    }
-
-    method !batch(&processor, uint $granularity) {
 
         # Logic for making sure batch size has correct granularity
-        my sub granulize(uint $batch) {
-            $batch %% $granularity
-              ?? $batch
-              !! ($batch div $granularity * $granularity) || $granularity
-        }
+        my &granulize := $granularity == 1
+          ?? -> uint $batch { $batch }
+          !! -> uint $batch {
+                nqp::mod_i($batch,$granularity)
+                  ?? nqp::mul_i(nqp::div_i($batch,$granularity),$granularity)
+                       || $granularity
+                  !! $batch
+             }
 
         # Local copy of first buffer, make sure it is granulized correctly
         my $first := $!buffer;
@@ -337,18 +303,23 @@ class ParaSeq does Sequence {
           nqp::push($first,$pulled)
         );
 
-        # Set up initial back pressure queue allowing for one batch to
-        # be created for each worker thread
-        my uint $degree    = $!degree;
-        my      $pressure := nqp::create(ParaQueue);
-        nqp::push($pressure, 2048) for ^$degree;
+        # Set up back pressure queue with some simple variation
+        my $pressure   := nqp::create(ParaQueue);
+        my uint $degree = $!degree;
+        my uint $half   = nqp::div_i($!batch,2) || $!batch;
+        my uint $batch;
+        for ^$!degree {
+            nqp::push($pressure,granulize($batch = $batch + $half));
+        }
 
         # Queue the first buffer we already filled, and set up the
         # result iterator
         processor(
           0,
           $first,
-          ($!result := ParaIterator.new(self, $pressure)).semaphore
+          ($!result := ParaIterator.new(
+            self, $pressure, $!batch)
+          ).semaphore
         );
 
         # Make sure the scheduling of further batches actually happen in a
@@ -403,12 +374,19 @@ class ParaSeq does Sequence {
       uint $ordinal, uint $then, $input, $semaphore, $output
     ) {
 
-        # If we're still running
-        unless nqp::atomicload_i($!stop) {
+        # No longer running, mark as discarded
+        if nqp::atomicload_i($!stop) {
+            nqp::atomicadd_i($!discarded,nqp::elems(nqp::decont($output)));
+        }
 
-            # Push the statistics as the last element in the output
+        # Still running
+        else {
+
+            # Push the statistics into the waiting queue of the iterator
+            # so that it has up-to-date information to determine future
+            # batch sizes
             nqp::push(
-              nqp::decont($output),
+              $!result.waiting,
               ParaStats.new(
                 $ordinal,
                 nqp::elems(nqp::decont($input)),
@@ -476,6 +454,13 @@ class ParaSeq does Sequence {
     method stats( ParaSeq:D:) { $!result.stats.List }
 
     method stopped(ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
+
+    method threads(ParaSeq:D:) {
+        self.stats.map(*.threadid).unique
+    }
+    method batch-sizes(ParaSeq:D:) {
+        self.stats.map(*.processed).minmax
+    }
 
 #- map -------------------------------------------------------------------------
 

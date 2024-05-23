@@ -7,7 +7,7 @@ ok &hyperize, 'was hyperize exported';
 ok &racify,   'was racify exported';
 
 my constant $elems = 200000;
-my constant $batch = 2000;
+my constant $batch = 16;
 my constant @list  = (^$elems).List;
 
 isa-ok @list.&hyperize, ParaSeq, 'did hyperize produce a ParaSeq';

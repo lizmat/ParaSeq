@@ -4,7 +4,7 @@ use ParaSeq;
 plan 44;
 
 my constant $elems = 200000;
-my constant $batch = 200;
+my constant $batch = 16;
 my constant @list  = (^$elems).reverse.List;
 
 my constant $grepper = * %% 2;

@@ -5,7 +5,7 @@ use ParaSeq;
 plan 16;
 
 my constant $elems = 200000;
-my constant $batch = 2000;
+my constant $batch = 16;
 my constant @list  = (^$elems).List;
 
 my constant $skip   = @list.skip.List;

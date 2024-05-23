@@ -55,7 +55,7 @@ Alternately, if the initial batch size is large enough to exhaust the
 source, it is clearly too large.  Which is interpreted as not making
 any sense at parallelization either.  So it won't.
 
-Note that the default initial batch size is B<10>, rather than B<64>
+Note that the default initial batch size is B<16>, rather than B<64>
 in the current implementation of C<.hyper> and C<.race>, making the
 chance smaller that parallelization is abandoned too soon.
 
