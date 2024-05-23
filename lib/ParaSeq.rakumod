@@ -139,10 +139,12 @@ my class ParaIterator does Iterator {
             $!produced  = $produced;
             $!nsecs     = $nsecs;
 
-            nqp::push(  # initiate more work with updated batch size
-              $!pressure,
-              $!batch = nqp::div_i(nqp::mul_i($processed,$target-nsecs),$nsecs)
-            );
+            # Update batch size
+            $!batch = nqp::div_i(nqp::mul_i($processed,$target-nsecs),$nsecs)
+              if $nsecs;
+
+            # Initiate more work with updated batch size
+            nqp::push($!pressure,$!batch);
         }
 
         # Next buffer to be processed
