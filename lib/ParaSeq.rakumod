@@ -99,7 +99,7 @@ my class ParaIterator does Iterator {
         );
 
 #say "delivered $!delivered, produced $!parent.produced()";
-        nqp::push($!pressure,Mu);  # initiate more work
+        nqp::push($!pressure,2048);  # initiate more work
 
         $buffer
     }
@@ -262,7 +262,7 @@ class ParaSeq does Sequence {
         # be created for each worker thread
         my uint $degree    = $!degree;
         my      $pressure := nqp::create(ParaQueue);
-        nqp::push($pressure, Mu) for ^$degree;
+        nqp::push($pressure, 2048) for ^$degree;
 
         # Queue the first buffer we already filled, and set up the
         # result iterator
@@ -286,77 +286,15 @@ class ParaSeq does Sequence {
             my $result := $!result;
             my $stats  := $!stats;
 
-            my uint $batch = $!batch;
-
-            # Set up initial batch sizes to introduce sufficient noise
-            # to make sure we won't be influenced too much by the random
-            # noise that is already involved in doing multi-threading
-            my int $checkpoints = 3 * $degree;
-            my uint @initial = (^$checkpoints).map: {
-                nqp::coerce_ni($batch * (0.5e0 + nqp::rand_n(10e0)))
-            }
-
-            # Initial noisifying in setting the batch size
-            my multi sub tweak-batch(Mu $ok) {
-                $batch = nqp::shift_i(@initial) if nqp::elems(@initial);
-            }
-
-            # Shortcut to the last N results
-            my uint @avg-nsecs;
-            my uint @batch;
-
-            # Logic for tweaking the batch size by looking at the last N
-            # stats that have been collected.  If enough stats collected
-            # then zero in on the batch size with the lowest average nsecs
-            my multi sub tweak-batch(ParaStats:D $ok) {
-                my uint $lowest = $ok.average-nsecs;
-
-                # Still some initially fuzzed batch sizes
-                if nqp::elems(@initial) {
-                    $batch = nqp::shift_i(@initial);
-                }
-
-                # No more fuzzed, need to calculate
-                else {
-                    my uint $new = $ok.processed;
-                    my uint $m   = nqp::elems(@avg-nsecs);
-                    my  int $i   = -1;
-                    nqp::while(
-                      ++$i < $m,
-                      nqp::if(
-                        nqp::isle_i(nqp::atpos_i(@avg-nsecs,$i),$lowest),
-                        nqp::stmts(
-                          ($lowest = nqp::atpos_i(@avg-nsecs,$i)),
-                          ($new    = nqp::atpos_i(@batch,$i))
-                        )
-                      )
-                    );
-
-                    # Remove oldest
-                    nqp::shift_i(@avg-nsecs);
-                    nqp::shift_i(@batch);
-
-                    # Set new batch size with a higher tendency
-                    $batch = nqp::coerce_ni($new * 1.2e0);
-#say "processed = $ok.processed(), produced = $ok.produced(), nsecs = $ok.nsecs(), batch = $batch";
-                }
-
-                # Now update the lists of stats
-                nqp::push_i(@avg-nsecs, $lowest);
-                nqp::push_i(@batch,     $ok.processed);
-                nqp::push($stats, $ok);
-            }
-
             # Until we're halted or have a buffer that's not full
             nqp::until(
               nqp::atomicload_i($!stop)  # complete shutdown requested
                 || $exhausted,           # nothing left to batch
               nqp::stmts(
-                tweak-batch(nqp::shift($pressure)), # wait for ok to proceed
                 ($exhausted = nqp::eqaddr(
                   $source.push-exactly(
                     (my $buffer := nqp::create(IterationBuffer)),
-                    $batch
+                    nqp::shift($pressure)  # wait for ok to proceed
                   ),
                   IterationEnd
                 )),
@@ -397,7 +335,7 @@ class ParaSeq does Sequence {
         # be created for each worker thread
         my uint $degree    = $!degree;
         my      $pressure := nqp::create(ParaQueue);
-        nqp::push($pressure, Mu) for ^$degree;
+        nqp::push($pressure, 2048) for ^$degree;
 
         # Queue the first buffer we already filled, and set up the
         # result iterator
@@ -421,78 +359,15 @@ class ParaSeq does Sequence {
             my $result := $!result;
             my $stats  := $!stats;
 
-            # Make sure batch size has the right granularity
-            my uint $batch = granulize($!batch);
-
-            # Set up initial batch sizes to introduce sufficient noise
-            # to make sure we won't be influenced too much by the random
-            # noise that is already involved in doing multi-threading
-            my int $checkpoints = 3 * $degree;
-            my uint @initial = (^$checkpoints).map: {
-                granulize(nqp::coerce_ni($batch * (0.5e0 + nqp::rand_n(10e0))))
-            }
-
-            # Initial noisifying in setting the batch size
-            my multi sub tweak-batch(Mu $ok) {
-                $batch = nqp::shift_i(@initial) if nqp::elems(@initial);
-            }
-
-            # Shortcut to the last N results
-            my uint @avg-nsecs;
-            my uint @batch;
-
-            # Logic for tweaking the batch size by looking at the last N
-            # stats that have been collected.  If enough stats collected
-            # then zero in on the batch size with the lowest average nsecs
-            my multi sub tweak-batch(ParaStats:D $ok) {
-                my uint $lowest = $ok.average-nsecs;
-
-                # Still some initially fuzzed batch sizes
-                if nqp::elems(@initial) {
-                    $batch = nqp::shift_i(@initial);
-                }
-
-                # No more fuzzed, need to calculate
-                else {
-                    my uint $new = $ok.processed;
-                    my uint $m   = nqp::elems(@avg-nsecs);
-                    my  int $i   = -1;
-                    nqp::while(
-                      ++$i < $m,
-                      nqp::if(
-                        nqp::isle_i(nqp::atpos_i(@avg-nsecs,$i),$lowest),
-                        nqp::stmts(
-                          ($lowest = nqp::atpos_i(@avg-nsecs,$i)),
-                          ($new    = nqp::atpos_i(@batch,$i))
-                        )
-                      )
-                    );
-
-                    # Remove oldest
-                    nqp::shift_i(@avg-nsecs);
-                    nqp::shift_i(@batch);
-
-                    # Set new batch size with a higher tendency
-                    $batch = granulize(nqp::coerce_ni($new * 1.2e0));
-#say "processed = $ok.processed(), produced = $ok.produced(), nsecs = $ok.nsecs(), batch = $batch";
-                }
-
-                # Now update the lists of stats
-                nqp::push_i(@avg-nsecs, $lowest);
-                nqp::push_i(@batch,     $ok.processed);
-                nqp::push($stats, $ok);
-            }
-
             # Until we're halted or have a buffer that's not full
             nqp::until(
               nqp::atomicload_i($!stop)  # complete shutdown requested
                 || $exhausted,           # nothing left to batch
               nqp::stmts(
-                tweak-batch(nqp::shift($pressure)), # wait for ok to proceed
                 ($exhausted = nqp::eqaddr(
                   $source.push-exactly(
                     (my $buffer := nqp::create(IterationBuffer)),
-                    $batch
+                    granulize(nqp::shift($pressure))  # wait for ok to proceed
                   ),
                   IterationEnd
                 )),
