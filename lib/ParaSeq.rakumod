@@ -22,13 +22,15 @@ my class ParaQueue is repr('ConcBlockingQueue') { }
 # of the values from the buffer, and then from the iterator
 
 my class BufferIterator does Iterator {
-    has $!buffer;
-    has $!iterator;
+    has $!parent;    # ParaSeq parent object
+    has $!buffer;    # first buffer to produce from
+    has $!iterator;  # iterator to produce from onwards
 
-    method new($buffer, $iterator) {
+    method new(\parent, \buffer, \iterator) {
         my $self := nqp::create(self);
-        nqp::bindattr($self,BufferIterator,'$!buffer',  nqp::decont($buffer));
-        nqp::bindattr($self,BufferIterator,'$!iterator',$iterator           );
+        nqp::bindattr($self,BufferIterator,'$!parent',  parent  );
+        nqp::bindattr($self,BufferIterator,'$!buffer',  buffer  );
+        nqp::bindattr($self,BufferIterator,'$!iterator',iterator);
         $self
     }
 
@@ -586,7 +588,7 @@ class ParaSeq does Sequence {
     # one.  Otherwise
     method iterator(ParaSeq:D:) {
         $!result //= nqp::istype($!buffer,IterationBuffer)
-          ?? BufferIterator.new($!buffer, $!source)
+          ?? BufferIterator.new(self, $!buffer, $!source)
           !! $!source
     }
 
