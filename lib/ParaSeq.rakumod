@@ -798,13 +798,13 @@ class ParaSeq does Sequence {
 #- endpoints -------------------------------------------------------------------
 
     multi method elems(ParaSeq:D:) {
-        $!source.is-lazy
+        self.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.elems',"")
           !! self!count
     }
 
     multi method end(ParaSeq:D:) {
-        $!source.is-lazy
+        self.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.end',"")
           !! self!count - 1
     }
@@ -814,8 +814,14 @@ class ParaSeq does Sequence {
         self.stop;
         nqp::eqaddr($value,IE) ?? Nil !! $value
     }
-    multi method tail(   ParaSeq:D:) { self.Seq.tail  }
-    multi method is-lazy(ParaSeq:D:) { $!source.is-lazy }
+
+    multi method tail(ParaSeq:D:) {
+        self.Seq.tail
+    }
+
+    multi method is-lazy(ParaSeq:D:) {
+        nqp::hllbool($!source.is-lazy && nqp::not_i($!stop-after))
+    }
 
 #- coercers --------------------------------------------------------------------
 
