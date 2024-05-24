@@ -932,6 +932,25 @@ multi sub hyperize(
       'hyperize'
     )
 }
+multi sub hyperize(
+  List:D $list,
+         $size?,
+         $degree?,
+  Bool  :$auto       = True,
+        :$stop-after = Inf,
+) {
+    my uint $batch = $size // $default-batch;
+    $list.is-lazy || $list.elems > $batch
+      ?? ParaSeq.parent(
+           $list,
+           ($batch // $default-batch).Int,
+           $auto,
+           ($degree // $default-degree).Int,
+           $stop-after == Inf ?? 0 !! $stop-after,
+           'hyperize'
+         )
+      !! $list
+}
 
 proto sub racify(|) is export {*}
 multi sub racify(\iterable, $, 1, *%_) is raw { iterable }
@@ -940,7 +959,7 @@ multi sub racify(
   Int   $batch?,
   Int   $degree?,
   Bool :$auto       = True,
-        :$stop-after = Inf,
+       :$stop-after = Inf,
 ) {
     ParaSeq.parent(
       iterable,
@@ -950,6 +969,25 @@ multi sub racify(
       $stop-after == Inf ?? 0 !! $stop-after,
       'racify'
     )
+}
+multi sub racify(
+  List:D $list,
+  Int    $size?,
+  Int    $degree?,
+  Bool  :$auto       = True,
+        :$stop-after = Inf,
+) {
+    my uint $batch = $size // $default-batch;
+    $list.is-lazy || $list.elems > $batch
+      ?? ParaSeq.parent(
+           $list,
+           $batch,
+           $auto,
+           ($degree // $default-degree).Int,
+           $stop-after == Inf ?? 0 !! $stop-after,
+           'racify'
+         )
+      !! $list
 }
 
 # vim: expandtab shiftwidth=4
