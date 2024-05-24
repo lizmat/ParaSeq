@@ -72,12 +72,13 @@ my class ParaIterator does Iterator {
     has ParaQueue $!queues;     # other queues to produce from
     has ParaQueue $!pressure;   # backpressure provider
     has ParaQueue $.waiting;    # queue with unprocessed ParaStats objects
-    has IB        $.stats;      # list with processed ParaStats objects
-    has uint      $.batch;      # initial / current batch size
-    has uint      $.auto;       # 1 if batch size automatically adjust on load
-    has uint      $.processed;  # number of items processed so far
-    has uint      $.produced;   # number of items produced so far
-    has uint      $.nsecs;      # nano seconds wallclock used so far
+    has IB        $!stats;      # list with processed ParaStats objects
+    has uint      $!batch;      # initial / current batch size
+    has uint      $!auto;       # 1 if batch size automatically adjust on load
+    has uint      $!racing;     # 1 if racing, else hypering
+    has uint      $!processed;  # number of items processed so far
+    has uint      $!produced;   # number of items produced so far
+    has uint      $!nsecs;      # nano seconds wallclock used so far
     has uint      $!todo;       # number of items left to deliver
     has atomicint $!stop;       # stop all processing if 1
 
@@ -86,20 +87,22 @@ my class ParaIterator does Iterator {
            \pressure,
       uint $batch,
       uint $auto,
+      uint $racing,
       uint $todo,
     ) {
         my $self := nqp::create(self);
 
-        nqp::bindattr($self,ParaIterator,'$!parent',parent);
-        nqp::bindattr($self,ParaIterator,'$!current',emptyIB);  # first fetch
-        nqp::bindattr($self,ParaIterator,'$!queues',nqp::create(ParaQueue));
-        nqp::bindattr($self,ParaIterator,'$!pressure',pressure);
-        nqp::bindattr($self,ParaIterator,'$!waiting',nqp::create(ParaQueue));
-        nqp::bindattr($self,ParaIterator,'$!stats',nqp::create(IB));
+        nqp::bindattr($self,ParaIterator,'$!parent',  parent                );
+        nqp::bindattr($self,ParaIterator,'$!current', emptyIB               );
+        nqp::bindattr($self,ParaIterator,'$!queues',  nqp::create(ParaQueue));
+        nqp::bindattr($self,ParaIterator,'$!pressure',pressure              );
+        nqp::bindattr($self,ParaIterator,'$!waiting', nqp::create(ParaQueue));
+        nqp::bindattr($self,ParaIterator,'$!stats',   nqp::create(IB)       );
 
-        nqp::bindattr_i($self,ParaIterator,'$!batch',$batch);
-        nqp::bindattr_i($self,ParaIterator,'$!auto', $auto );
-        nqp::bindattr_i($self,ParaIterator,'$!todo', $todo );
+        nqp::bindattr_i($self,ParaIterator,'$!batch', $batch );
+        nqp::bindattr_i($self,ParaIterator,'$!auto',  $auto  );
+        nqp::bindattr_i($self,ParaIterator,'$!racing',$racing);
+        nqp::bindattr_i($self,ParaIterator,'$!todo',  $todo  );
         $self
     }
 
@@ -107,7 +110,7 @@ my class ParaIterator does Iterator {
     method !next-batch(\next) {
 
         # Next buffer to be processed
-        my $buffer := nqp::shift(next);
+        my $buffer := $!racing ?? next !! nqp::shift(next);
 
         # Complete shutdown requested
         if nqp::atomicload_i($!stop) {
@@ -118,8 +121,10 @@ my class ParaIterator does Iterator {
         elsif $!todo {
             my int $todo = nqp::sub_i($!todo,nqp::elems($buffer));
             if $todo <= 0 {
-                self.stop;  # stop all processing, we have enough
-                $!todo = 0;
+                # Stop all processing, we have enough
+                self.stop;
+
+                # Get rid of all values we don't need
                 return nqp::splice(
                   $buffer,
                   emptyIB,
@@ -245,13 +250,17 @@ my class ParaIterator does Iterator {
         $!parent.stop;                 # stop all threads
     }
 
-    # Add a semaphore to the queue.  This is a ParaQueue to which a
-    # fully processed IterationnBuffer will be pushed when it is ready.
-    # Until then, it will block if it is not ready yet.  As such, the
-    # associated nqp::shift acts both as a semaphore as well as the
-    # IterationBuffer with values
+    # Add a semaphore to the queue.  When hypering, This is a ParaQueue to
+    # which a fully processed IterationBuffer will be pushed when it is
+    # ready.  This guarantees that the order of the results will be the
+    # order in which this method will be called.  However, when racing
+    # it will just return the queues ParaQueue.  This causes ready
+    # IterationBuffers to be added whenever they're ready, and thus *not*
+    # guarantee the order anymore.
     method semaphore() {
-        nqp::push($!queues,nqp::create(ParaQueue))
+        $!racing
+          ?? $!queues
+          !! nqp::push($!queues,nqp::create(ParaQueue))
     }
 }
 
@@ -294,11 +303,12 @@ class ParaSeq does Sequence {
     has           $!result;      # iterator producing result values
     has           $!SCHEDULER;   # $*SCHEDULER to be used
     has uint      $.batch;       # initial batch size, must be > 0
-    has uint      $.auto;        # 1 if batch size automatically adjusts
+    has uint      $!auto;        # 1 if batch size automatically adjusts
+    has uint      $!racing;      # 1 if racing instead of hypering
     has uint      $.degree;      # number of CPUs, must be > 1
-    has uint      $.stop-after;  # stop after these number of values
-    has atomicint $.discarded;   # produced values discarded because of stop
+    has uint      $!stop-after;  # stop after these number of values
     has atomicint $!stop;        # stop all processing if 1
+    has atomicint $.discarded;   # produced values discarded because of stop
  
 #- private helper methods ------------------------------------------------------
 
@@ -319,6 +329,8 @@ class ParaSeq does Sequence {
 
         # Set it up!
         my $self := nqp::create(self);
+        nqp::bindattr_i($self,ParaSeq,'$!racing',nqp::iseq_s($method,'racify'));
+
         nqp::bindattr_i($self, ParaSeq, '$!batch',      $batch     );
         nqp::bindattr_i($self, ParaSeq, '$!auto',       $auto      );
         nqp::bindattr_i($self, ParaSeq, '$!degree',     $degree    );
@@ -377,7 +389,7 @@ class ParaSeq does Sequence {
           0,
           $first,
           ($!result := ParaIterator.new(
-            self, $pressure, $!batch, $!auto, $!stop-after
+            self, $pressure, $!batch, $!auto, $!racing, $!stop-after
           )).semaphore
         );
 
@@ -518,11 +530,12 @@ class ParaSeq does Sequence {
     method default-degree() { $default-degree }
     method default-batch()  { $default-batch  }
 
-    method degree(ParaSeq:D:) { $!degree            }
-    method batch( ParaSeq:D:) { $!batch             }
     method stats( ParaSeq:D:) { $!result.stats.List }
 
-    method stopped(ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
+    method auto(      ParaSeq:D:) { nqp::hllbool($!auto)                    }
+    method racing(    ParaSeq:D:) { nqp::hllbool($!racing)                  }
+    method stop-after(ParaSeq:D:) { $!stop-after || False                   }
+    method stopped(   ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
 
     method threads(ParaSeq:D:) {
         self.stats.map(*.threadid).unique
@@ -842,9 +855,23 @@ multi sub hyperize(
     )
 }
 
-# For now, there doesn't seem to be too much to be gained by supporting
-# an alternate path where the order of the results is *not* preserved,
-# so just equate "racify" with "hyperize" for now
-my constant &racify is export = &hyperize;
+proto sub racify(|) is export {*}
+multi sub racify(\iterable, $, 1, *%_) is raw { iterable }
+multi sub racify(
+         \iterable,
+  Int:D  $batch      = $default-batch,
+  Int:D  $degree     = $default-degree,
+  Bool  :$auto       = True,
+        :$stop-after = Inf,
+) {
+    ParaSeq.parent(
+      iterable,
+      $batch,
+      $auto,
+      $degree,
+      $stop-after == Inf ?? 0 !! $stop-after,
+      'racify'
+    )
+}
 
 # vim: expandtab shiftwidth=4
