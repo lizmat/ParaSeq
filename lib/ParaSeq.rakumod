@@ -13,8 +13,9 @@ my sub granularity(&callable) {
     $count == Inf ?? 1 !! $count
 }
 
-# Shortcut for long IterationBuffer name, just for esthetics
+# Shortcut for long names, just for esthetics
 my constant IB = IterationBuffer;
+my constant IE = IterationEnd;
 
 # An empty IterationBuffer, for various places where it is needed as a source
 my constant emptyIB = nqp::create(IB);
@@ -48,8 +49,8 @@ my class BufferIterator does Iterator {
     }
 
     method push-all(\target) {
-        nqp::istype(target, IB)
-          ?? nqp::splice(target, $!buffer, nqp::elems(target), 0)
+        nqp::istype(target,IB)
+          ?? nqp::splice(target, $!buffer,nqp::elems(target), 0)
           !! $!buffer.iterator.push-all(target);
         $!buffer := Mu;
 
@@ -73,12 +74,13 @@ my class ParaIterator does Iterator {
     has ParaQueue $.waiting;    # queue with unprocessed ParaStats objects
     has IB        $.stats;      # list with processed ParaStats objects
     has uint      $.batch;      # initial / current batch size
+    has uint      $.auto;       # 1 if batch size automatically adjust on load
     has uint      $.processed;  # number of items processed seen so far
     has uint      $.produced;   # number of items produced seen so far
     has uint      $.nsecs;      # nano seconds wallclock used so far
     has atomicint $!stop;       # stop all processing if 1
 
-    method new(\parent, \pressure, uint $batch) {
+    method new(\parent, \pressure, uint $batch, uint $auto) {
         my $self := nqp::create(self);
         nqp::bindattr($self,ParaIterator,'$!parent',parent);
         nqp::bindattr($self,ParaIterator,'$!current',emptyIB);  # first fetch
@@ -88,10 +90,11 @@ my class ParaIterator does Iterator {
         nqp::bindattr($self,ParaIterator,'$!stats',nqp::create(IB));
 
         nqp::bindattr_i($self,ParaIterator,'$!batch',$batch);
+        nqp::bindattr_i($self,ParaIterator,'$!auto', $auto);
         $self
     }
 
-    method close-queues(ParaIterator:D:) { nqp::push($!queues,IterationEnd) }
+    method close-queues(ParaIterator:D:) { nqp::push($!queues,IE) }
 
     method stop(ParaIterator:D:) {
         nqp::atomicstore_i($!stop,1);  # stop producing here
@@ -140,8 +143,11 @@ my class ParaIterator does Iterator {
             $!nsecs     = $nsecs;
 
             # Update batch size
-            $!batch = nqp::div_i(nqp::mul_i($processed,$target-nsecs),$nsecs)
-              if $nsecs;
+            if $!auto {
+                $!batch =
+                  nqp::div_i(nqp::mul_i($processed,$target-nsecs),$nsecs)
+                  if $nsecs;
+            }
 
             # Initiate more work with updated batch size
             nqp::push($!pressure,$!batch);
@@ -156,8 +162,8 @@ my class ParaIterator does Iterator {
           nqp::elems($!current),
           (my $pulled := nqp::shift($!current)),
           nqp::if(
-            nqp::eqaddr((my $next := nqp::shift($!queues)),IterationEnd),
-            (return IterationEnd),
+            nqp::eqaddr((my $next := nqp::shift($!queues)),IE),
+            (return IE),
             nqp::stmts(
               ($!current := self!next-batch($next)),
               ($pulled   := self.pull-one)
@@ -165,7 +171,7 @@ my class ParaIterator does Iterator {
           )
         );
 
-        nqp::atomicload_i($!stop) ?? IterationEnd !! $pulled
+        nqp::atomicload_i($!stop) ?? IE !! $pulled
     }
 
     method skip-at-least(uint $skipping) {
@@ -186,7 +192,7 @@ my class ParaIterator does Iterator {
               )
             ),
             nqp::if(             # ignored whole buffer, fetch next
-              nqp::eqaddr((my $next := nqp::shift($queues)),IterationEnd),
+              nqp::eqaddr((my $next := nqp::shift($queues)),IE),
               (return 0)         # really done
             ),
             ($toskip = nqp::sub_i($toskip,$elems)),
@@ -207,14 +213,14 @@ my class ParaIterator does Iterator {
           nqp::stmts(
             target.append($current),
             nqp::if(
-              nqp::eqaddr((my $next := nqp::shift($queues)),IterationEnd),
-              (return IterationEnd),
+              nqp::eqaddr((my $next := nqp::shift($queues)),IE),
+              (return IE),
               ($current := self!next-batch($next))
             )
           )
         );
 
-        IterationEnd  # really done, because stopped
+        IE  # really done, because stopped
     }
 }
 
@@ -258,6 +264,7 @@ class ParaSeq does Sequence {
     has           $!SCHEDULER;  # $*SCHEDULER to be used
     has uint      $.degree;     # number of CPUs, must be > 1
     has uint      $.batch;      # initial batch size, must be > 0
+    has uint      $.auto;       # 1 if batch size automatically adjusts
     has atomicint $.discarded;  # produced values discarded because of stop
     has atomicint $!stop;       # stop all processing if 1
 
@@ -265,7 +272,12 @@ class ParaSeq does Sequence {
 
     # Do error checking and set up object if all ok
     method !setup(
-      str $method, uint $batch, uint $degree, $buffer, $source
+       str $method,
+      uint $batch,
+      uint $auto,
+      uint $degree,
+           $buffer,
+           $source
     ) is hidden-from-backtrace {
         X::Invalid::Value.new(:$method, :name<batch>,  :value($batch)).throw
           if $batch <= 0;
@@ -275,6 +287,7 @@ class ParaSeq does Sequence {
         # Set it up!
         my $self := nqp::create(self);
         nqp::bindattr_i($self, ParaSeq, '$!batch',     $batch              );
+        nqp::bindattr_i($self, ParaSeq, '$!auto',      $auto               );
         nqp::bindattr_i($self, ParaSeq, '$!degree',    $degree             );
         nqp::bindattr(  $self, ParaSeq, '$!SCHEDULER', $*SCHEDULER         );
         nqp::bindattr(  $self, ParaSeq, '$!buffer',    nqp::decont($buffer));
@@ -301,17 +314,26 @@ class ParaSeq does Sequence {
         $!buffer  := Mu;  # release buffer in object
         nqp::until(
           nqp::elems($first) %% $granularity
-            || nqp::eqaddr((my $pulled := $!source.pull-one),IterationEnd),
+            || nqp::eqaddr((my $pulled := $!source.pull-one),IE),
           nqp::push($first,$pulled)
         );
 
-        # Set up back pressure queue with some simple variation
-        my $pressure   := nqp::create(ParaQueue);
-        my uint $degree = $!degree;
-        my uint $half   = nqp::div_i($!batch,2) || $!batch;
-        my uint $batch;
-        for ^$!degree {
-            nqp::push($pressure,granulize($batch = $batch + $half));
+        # Batch size allowed to vary, so set up back pressure queue
+        # with some simple variation
+        my $pressure  := nqp::create(ParaQueue);
+        my uint $batch = $!batch;
+        if $!auto {
+            my uint $half = nqp::div_i($batch,2) || $batch;
+            $batch = 0;
+
+            nqp::push($pressure,granulize($batch = $batch + $half))
+              for ^$!degree;
+        }
+
+        # Fixed batch size, so set up back pressure queue with fixed values
+        else {
+            $batch = granulize($batch);
+            nqp::push($pressure,$batch) for ^$!degree;
         }
 
         # Queue the first buffer we already filled, and set up the
@@ -320,8 +342,8 @@ class ParaSeq does Sequence {
           0,
           $first,
           ($!result := ParaIterator.new(
-            self, $pressure, $!batch)
-          ).semaphore
+            self, $pressure, $!batch, $!auto
+          )).semaphore
         );
 
         # Make sure the scheduling of further batches actually happen in a
@@ -344,7 +366,7 @@ class ParaSeq does Sequence {
                     (my $buffer := nqp::create(IB)),
                     granulize(nqp::shift($pressure))  # wait for ok to proceed
                   ),
-                  IterationEnd
+                  IE
                 )),
                 nqp::if(         # add if something to add
                   nqp::elems($buffer) && nqp::not_i(nqp::atomicload_i($!stop)),
@@ -407,7 +429,7 @@ class ParaSeq does Sequence {
         my $iterator := self.iterator;
         my uint $elems;
         nqp::until(
-          nqp::eqaddr($iterator.pull-one, IterationEnd),
+          nqp::eqaddr($iterator.pull-one, IE),
           ++$elems
         );
         $elems
@@ -418,15 +440,23 @@ class ParaSeq does Sequence {
     # Entry point from the subs: made as small as possible so that the
     # fast path for iterators that don't produce enough values to warrant
     # paralellization, will quickly continue as if nothing happenend
-    method parent($source, uint $initial, uint $degree, str $method) {
+    method parent(
+           $source,
+      uint $initial,
+      uint $auto,
+      uint $degree,
+      str  $method
+    ) {
         my $iterator := $source.iterator;
         my $buffer   := nqp::create(IB);
 
-        nqp::eqaddr($iterator.push-exactly($buffer, $initial),IterationEnd)
+        nqp::eqaddr($iterator.push-exactly($buffer, $initial),IE)
           # First batch already exhausted iterator, so work with buffer
           ?? $buffer.Seq
           # Need to actually parallelize, set up ParaSeq object
-          !! self!setup($method, $initial, $degree, $buffer, $iterator)
+          !! self!setup(
+               $method, $initial, $auto, $degree, $buffer, $iterator
+             )
     }
 
 #- where all the magic happens under the hood ----------------------------------
@@ -478,7 +508,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.map($mapper).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd)
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
                     || nqp::atomicload_i($!stop),
                   nqp::push($output,$pulled)
                 );
@@ -504,7 +534,7 @@ class ParaSeq does Sequence {
                 my      $output := nqp::create(IB);
                 my $iterator := $input.Seq.grep($matcher).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IterationEnd)
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
                     || nqp::atomicload_i($!stop),
                   nqp::push($output,$pulled)
                 );
@@ -523,7 +553,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :k).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
                     || nqp::atomicload_i($!stop),
                   nqp::push($output,$offset + $key)
                 );
@@ -542,7 +572,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
                     || nqp::atomicload_i($!stop),
                   nqp::stmts(
                     nqp::push($output,$offset + $key),     # key
@@ -564,7 +594,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
                     || nqp::atomicload_i($!stop),
                   nqp::push(
                     $output,
@@ -593,7 +623,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $value := $iterator.pull-one),IterationEnd)
+                  nqp::eqaddr((my $value := $iterator.pull-one),IE)
                     || nqp::atomicload_i($!stop),
                   nqp::push($output,$value)
                 );
@@ -612,7 +642,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :k).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
                     || nqp::atomicload_i($!stop),
                   nqp::push($output,$offset + $key)
                 );
@@ -631,7 +661,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
                     || nqp::atomicload_i($!stop),
                   nqp::stmts(
                     nqp::push($output,$offset + $key),     # key
@@ -653,7 +683,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IterationEnd)
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
                     || nqp::atomicload_i($!stop),
                   nqp::push(
                     $output,
@@ -757,15 +787,16 @@ class ParaSeq does Sequence {
 #- actual interface ------------------------------------------------------------
 
 proto sub hyperize(|) is export {*}
-multi sub hyperize(\iterable, $, 1) is raw { iterable }
-multi sub hyperize(\iterable) {
-   ParaSeq.parent(iterable, $default-batch, $default-degree, 'hyperize')
-}
-multi sub hyperize(\iterable, Int:D $batch) {
-   ParaSeq.parent(iterable, $batch, $default-degree, 'hyperize')
-}
-multi sub hyperize(\iterable, Int:D $batch, Int:D $degree) {
-   ParaSeq.parent(iterable, $batch, $degree, 'hyperize')
+multi sub hyperize(\iterable, $, 1, *%_) is raw { iterable }
+multi sub hyperize(
+         \iterable,
+  Int:D  $batch  = $default-batch,
+  Int:D  $degree = $default-degree,
+  Bool  :$auto   = True,
+) {
+    ParaSeq.parent(
+      iterable, $batch, $auto, $degree, 'hyperize'
+    )
 }
 
 # For now, there doesn't seem to be too much to be gained by supporting
