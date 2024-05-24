@@ -837,6 +837,14 @@ class ParaSeq does Sequence {
     multi method Seq(  ParaSeq:D:) { Seq.new: self.iterator          }
     multi method Slip( ParaSeq:D:) { self.IterationBuffer.Slip       }
 
+    multi method Bool(ParaSeq:D:) {
+        my $Bool := nqp::hllbool(
+          nqp::not_i(nqp::eqaddr(self.iterator.pull-one,IterationEnd))
+        );
+        self.stop;
+        $Bool
+    }
+
     multi method serial(ParaSeq:D:) { self.Seq }
 }
 
