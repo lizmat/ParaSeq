@@ -246,6 +246,8 @@ my class ParaIterator does Iterator {
         nqp::push($!queues,IE)
     }
 
+    method stats(ParaIterator:D:) is implementation-detail { $!stats }
+
     method stop(ParaIterator:D:) is implementation-detail {
         nqp::atomicstore_i($!stop,1);  # stop producing
         nqp::unshift($!queues,IE);     # stop reading from queues
@@ -546,30 +548,22 @@ class ParaSeq does Sequence {
         self.stats.map(*.processed).minmax
     }
 
-#- map -------------------------------------------------------------------------
+#- first -----------------------------------------------------------------------
 
-    proto method map(|) {*}
-    multi method map(ParaSeq:D: Callable:D $mapper) {
-
-        # Logic for queuing a buffer for map
-        my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
-            $SCHEDULER.cue: {
-                my uint $then    = nqp::time;
-                my      $output := nqp::create(IB);
-
-                my $iterator := $input.Seq.map($mapper).iterator;
-                nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
-                  nqp::push($output,$pulled)
-                );
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
-        # Let's go!
-        self!start(&processor, granularity($mapper))
+    proto method first(|) {*}
+    multi method first(ParaSeq:D:) {
+        self.Seq.first
+    }
+    multi method first(ParaSeq:D: Callable:D $matcher) {
+        self.Seq.first($matcher, |%_)
+    }
+    multi method first(ParaSeq:D: $matcher) {
+        self.Seq.first($matcher, |%_)
+    }
+    multi method first(ParaSeq:D: $matcher, :$end!) {
+        $end
+          ?? self.List.first($matcher, :end, |%_)
+          !! self.first($matcher, |%_)
     }
 
 #- grep ------------------------------------------------------------------------
@@ -663,6 +657,7 @@ class ParaSeq does Sequence {
           granularity($matcher)
         )
     }
+
     multi method grep(ParaSeq:D: $matcher, :$k, :$kv, :$p) {
         my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset for :k, :kv, :p
@@ -750,22 +745,30 @@ class ParaSeq does Sequence {
         self!start($k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v)
     }
 
-#- first -----------------------------------------------------------------------
+#- map -------------------------------------------------------------------------
 
-    proto method first(|) {*}
-    multi method first(ParaSeq:D:) {
-        self.Seq.first
-    }
-    multi method first(ParaSeq:D: Callable:D $matcher) {
-        self.Seq.first($matcher, |%_)
-    }
-    multi method first(ParaSeq:D: $matcher) {
-        self.Seq.first($matcher, |%_)
-    }
-    multi method first(ParaSeq:D: $matcher, :$end!) {
-        $end
-          ?? self.List.first($matcher, :end, |%_)
-          !! self.first($matcher, |%_)
+    proto method map(|) {*}
+    multi method map(ParaSeq:D: Callable:D $mapper) {
+
+        # Logic for queuing a buffer for map
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                my $iterator := $input.Seq.map($mapper).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
+                    || nqp::atomicload_i($!stop),
+                  nqp::push($output,$pulled)
+                );
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Let's go!
+        self!start(&processor, granularity($mapper))
     }
 
 #- other standard Iterable interfaces ------------------------------------------
@@ -817,12 +820,71 @@ class ParaSeq does Sequence {
         nqp::eqaddr($value,IE) ?? Nil !! $value
     }
 
-    multi method tail(ParaSeq:D:) {
-        self.Seq.tail
-    }
-
     multi method is-lazy(ParaSeq:D:) {
         nqp::hllbool($!source.is-lazy && nqp::not_i($!stop-after))
+    }
+
+    multi method join(ParaSeq:D: Str:D $joiner = '') {
+        self.fail-iterator-cannot-be-lazy('.join') if self.is-lazy;
+
+        # Logic for joining a buffer
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
+
+                nqp::push(
+                  (my $output := nqp::create(IB)),
+                  $input.List.join($joiner)
+                );
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Finish off by joining the joined strings
+        self!start(&processor).List.join($joiner)
+    }
+
+    multi method reduce(ParaSeq:D: Callable:D $reducer) {
+
+        # Logic for reducing a buffer
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
+
+                self!batch-done(
+                  $ordinal, $then, $input, $semaphore, $input.reduce($reducer)
+                );
+            }
+        }
+
+        # Finish off by reducing the reductions
+        self!start(&processor).Seq.reduce($reducer)
+    }
+
+    multi method sum(ParaSeq:D:) {
+        self.fail-iterator-cannot-be-lazy('.sum') if self.is-lazy;
+
+        # Logic for summing a buffer
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
+
+                nqp::push((my $output := nqp::create(IB)),$input.List.sum);
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Finish off by summing the sums
+        self!start(&processor).List.sum
+    }
+
+    multi method tail(ParaSeq:D:) {
+        self.Seq.tail
     }
 
 #- coercers --------------------------------------------------------------------

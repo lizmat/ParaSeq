@@ -2,10 +2,13 @@ Revision history for ParaSeq
 
 {{$NEXT}}
 
+0.0.3  2024-05-24T22:07:44+02:00
+    - Added bespoke support for .reduce, .sum and .join
+
 0.0.2  2024-05-24T19:15:21+02:00
     - Added proper batch adjustment logic
-    - Add :auto named arg, switch off batch adjustment with :!auto
-    - Add :stop-after(N) to limit number of values delivered
+    - Added :auto named arg, switch off batch adjustment with :!auto
+    - Added :stop-after(N) to limit number of values delivered
     - Added ParaSeq introspection methods: .auto, .batch-sizes,
       .default-batch, .default-degree, .racing, .stats, .stop-after,
       .stopped, .threads

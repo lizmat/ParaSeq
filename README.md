@@ -162,6 +162,14 @@ Int. The number of values that were produced in the associated batch. This can b
 
 Int. The numerical ID of low-level thread that processed the associated batch (aka its `$*THREAD.id`).
 
+COMPATIBILITY NOTES
+===================
+
+reduce
+------
+
+The `reduce` method is supported in hypered/racing mode, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
+
 IMPROVEMENTS
 ============
 

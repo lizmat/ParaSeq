@@ -1,0 +1,16 @@
+use Test;
+use ParaSeq;
+
+plan 4;
+
+my constant $elems = 200000;
+my constant @list  = (^$elems).map(*.Rat);
+my constant $sum   = @list.sum;
+
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize(Any, $_);
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.sum, $sum, "sum with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4
