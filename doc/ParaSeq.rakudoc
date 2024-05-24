@@ -10,6 +10,15 @@ ParaSeq - Parallel execution of Iterables
 
 use ParaSeq;
 
+# The 1-millionth prime number: 15485863
+say (^Inf).&hyperize.grep(*.is-prime)[999999];
+say (^Inf).&hyperize.grep(*.is-prime).skip(999999).head;
+say (^Inf).&hyperize(stop-after => 1_000_000).grep(*.is-prime).tail;
+
+# Fetching lines of files, each element containing a List of lines
+my @lines = @filenames.&hyperize(1, :!auto).map(*.lines.List);
+my %lines = @filenames.&racify(1, :!auto).map: { $_ => .lines.List }
+
 =end code
 
 =head1 DESCRIPTION
@@ -18,12 +27,184 @@ ParaSeq provides the functional equivalent of
 L<C<hyper>|https://docs.raku.org/type/Iterable#method_hyper> and
 L<C<race>|https://docs.raku.org/type/Iterable#method_race>, but
 re-implemented from scratch with all of the experience from the
-initial implementation of C<hyper> and <race> in 2014, and using
+initial implementation of C<hyper> and C<race> in 2014, and using
 features that have since been added to the Raku Programming Language.
 
 As such it exports two subroutines C<hyperize> and C<racify>, to
 make them plug-in compatible with the
 L<C<hyperize>|https://raku.land/zef:lizmat/hyperize> distribution.
+
+=head1 SUBROUTINES
+
+=head2 hyperize
+
+=begin code :lang<raku>
+
+# The 1-millionth prime number using subroutine syntax: 15485863
+say hyperize(^Inf).grep(*.is-prime)[999999];
+
+# Start with 2000 element batches, and use max 10 workers
+say (^Inf).&hyperize(2000, 10).grep(*.is-prime)[999999];
+
+# Stop producing results after 1 million values
+say (^Inf).&hyperize(stop-after => 1_000_000).grep(*.is-prime).tail;
+
+# Always work with a batch-size of 1
+my @lines = @filenames.&hyperize(1, :!auto).map(*.lines.List);
+
+=end code
+
+Change the given C<Iterable> into a C<ParaSeq> object if the following
+conditions have been met:
+
+=item degree is more than 1
+
+If the number of simultaneous workers is set to 1, there is no real
+parallelizetion possible.  In which case C<hyperize> will simply return
+its first argument (the invocant when used with the C<.&hyperize> syntax).
+
+=item source is not exhausted with first batch
+
+If the first batch already exhausts the source iterator, then there is
+little point in parallelizing.  A C<Seq> that will reproduce the original
+source sequence will then be returned.
+
+=head3 ARGUMENTS
+
+=item source
+
+The first positional argument indicates the C<Iterable> source of values
+to be processed.  If the C<.&hyperize> syntax is used, this is the invocant.
+
+=item initial batch size
+
+The second positional argument indicates the initial batch size to be
+used.  It defaults to C<16>.  Will also assume the default if an undefined
+value is specified.
+
+=item maximum number of simultaneous workers
+
+The third positional argument indicates the maximum number of worker
+threads that can be activated to process the values of the source.  It
+defaults to the number of available CPUs minus 1.  Will also assume the
+defailt if an undefined value is specified.
+
+=item :auto / :!auto
+
+Flag.  Defaults to C<True>.  If specified with a C<False> value, then the
+batch size will B<not> be altered from the size (implicitely) specified
+with the second positional argument.
+
+=item :stop-after(N)
+
+Integer value.  Defaults to C<Inf>, indicating there is B<no> maximum number
+of values that should be delivered.  If specified, should be a positive
+integer value: the produced sequence is then B<guaranteed> not to produce
+more values than the value given.
+
+=head2 racify
+
+=begin code :lang<raku>
+
+my %lines = @filenames.&racify(1, :!auto).map: { $_ => .lines.List }
+
+=end code
+
+The arguments to C<racify> are B<exactly the same> as the arguments to
+C<hyperize>.  But calling C<racify> will B<NOT> ensure that the values
+produced will be in the same order as the values from which they were
+produced.  Depending on the application, this can mean a small but
+potentially significant improvement of throughput.
+
+Situations where one typically would use C<racify>, is when the result
+is ultimately stored in a C<Hash> or a C<Map>, which does not have a
+predictable order of its elements anyway.
+
+=head1 PUBLIC CLASSES
+
+=head2 ParaSeq
+
+The class of which an instance is returned by C<hyperize> and C<racify>
+if the requirements for parallelizing have been met.
+
+Can be used in any situation where a C<Seq> could also be used.  The
+following additional methods can also be called for introspection and
+debugginng.  In alphabetical order:
+
+=head3 auto
+
+Bool.  Returns whether batch sizes will be automatically optimized to
+provide the best throughput.
+
+=head3 batch-sizes
+
+Range.  The smallest and largest batch size as a C<Range>.
+
+=head3 default-batch
+
+Int.  The default initial batch size: currently C<16>.
+
+=head3 default-degree
+
+Int.  The default maximum number of worker threads to be used.  Currently
+set to the number of available CPUs minus one.
+
+=head3 racing
+
+Bool.  Returns C<True> if racing semantics are used for delivering values.
+Otherwise C<False> (indicating hyper semantics, which B<does> guarantee
+the order of delivered values).
+
+=head3 stats
+
+A C<List> of C<ParaStats> objects that were produced, in the order that
+they were produced.
+
+=head3 stop-after
+
+Int or False.  Returns C<False> if there is B<no limit> on the number of
+values that can be delivered.  Otherwise returns the maximum number of
+values that will be delivered.
+
+=head3 stopped
+
+Bool.  C<True> if the processing of this C<ParaSeq> has been halted.
+Otherwise C<False>
+
+=head3 threads
+
+Returns a C<List> of the IDs of the CPU threads that have been used to
+produce the result.
+
+=head2 ParaStats
+
+The C<ParaStats> class is created for each batch that has been processed.
+It provides the following methods (in alphabetical order):
+
+=head3 nsecs
+
+Int.  The number of nano-seconds that it took to process all values in
+the associated batch.
+
+=head3 ordinal
+
+Int.  The ordinal number of the associated batch (starting at 0).
+
+=head3 processed
+
+Int.  The number of values processed in the associated batch (aka the
+batch size of that batch).
+
+=head3 produced
+
+Int.  The number of values that were produced in the associated batch.
+This can be C<0>, or a higher value than C<processed> when C<.map> was
+called with a C<Callable> that produced C<Slip> values.
+
+=head3 threadid
+
+Int.  The numerical ID of low-level thread that processed the associated
+batch (aka its C<$*THREAD.id>).
 
 =head1 IMPROVEMENTS
 
@@ -42,8 +223,10 @@ Batch sizes that are too small, have a tendency to have their resource
 usage drowned out by the overhead of batching and dispatching to
 threads.
 
-This implementation aims to adapt batch sizes from the originally
-(implicitely) specified one for better throughput and resource usage.
+This implementation automatically adapts batch sizes from the originally
+(implicitely) specified batch size for better throughput and resource
+usage.  If this feature is not desired, the C<:!auto> argumennt can be
+to switch automatic batch size adjustment off.
 
 =head2 Unnecessary parallelization
 
@@ -84,9 +267,10 @@ and not create anymore batches.
 
 =head2 Support more interface methods
 
-Currently only the C<.map> and C<.grep> methods are completely supported
-by the current implementation of C<.hyper> and C<.race>.  Other methods,
-such as C<.first>, will also be supported.
+Currently only the C<.map> and C<.grep> methods are supported by the
+current implementation of C<.hyper> and C<.race> (and not even completely).
+Complete support for C<.map> and C<.grep> are provided, and other methods
+(such as C<.first>) will also be supported.
 
 =head2 Use of phasers
 

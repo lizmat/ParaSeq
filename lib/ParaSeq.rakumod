@@ -246,7 +246,7 @@ my class ParaIterator does Iterator {
         nqp::push($!queues,IE)
     }
 
-    method stop(ParaIterator:D:) {
+    method stop(ParaIterator:D:) is implementation-detail {
         nqp::atomicstore_i($!stop,1);  # stop producing
         nqp::unshift($!queues,IE);     # stop reading from queues
         $!parent.stop;                 # stop all threads
@@ -540,7 +540,7 @@ class ParaSeq does Sequence {
     method stopped(   ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
 
     method threads(ParaSeq:D:) {
-        self.stats.map(*.threadid).unique
+        self.stats.map(*.threadid).unique.List
     }
     method batch-sizes(ParaSeq:D:) {
         self.stats.map(*.processed).minmax
