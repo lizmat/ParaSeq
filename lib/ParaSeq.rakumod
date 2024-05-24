@@ -242,7 +242,9 @@ my class ParaIterator does Iterator {
         );
     }
 
-    method close-queues(ParaIterator:D:) { nqp::push($!queues,IE) }
+    method close-queues(ParaIterator:D:) is implementation-detail {
+        nqp::push($!queues,IE)
+    }
 
     method stop(ParaIterator:D:) {
         nqp::atomicstore_i($!stop,1);  # stop producing
@@ -257,7 +259,7 @@ my class ParaIterator does Iterator {
     # it will just return the queues ParaQueue.  This causes ready
     # IterationBuffers to be added whenever they're ready, and thus *not*
     # guarantee the order anymore.
-    method semaphore() {
+    method semaphore() is implementation-detail {
         $!racing
           ?? $!queues
           !! nqp::push($!queues,nqp::create(ParaQueue))
@@ -494,7 +496,7 @@ class ParaSeq does Sequence {
       uint $degree,
       uint $stop-after,
       str  $method
-    ) {
+    ) is implementation-detail {
         my $iterator := $source.iterator;
         my $buffer   := nqp::create(IB);
 
@@ -527,8 +529,8 @@ class ParaSeq does Sequence {
 
 #- introspection ---------------------------------------------------------------
 
-    method default-degree() { $default-degree }
     method default-batch()  { $default-batch  }
+    method default-degree() { $default-degree }
 
     method stats( ParaSeq:D:) { $!result.stats.List }
 
@@ -854,16 +856,16 @@ proto sub hyperize(|) is export {*}
 multi sub hyperize(\iterable, $, 1, *%_) is raw { iterable }
 multi sub hyperize(
          \iterable,
-  Int:D  $batch      = $default-batch,
-  Int:D  $degree     = $default-degree,
-  Bool  :$auto       = True,
-        :$stop-after = Inf,
+        $batch?,
+        $degree?,
+  Bool :$auto       = True,
+       :$stop-after = Inf,
 ) {
     ParaSeq.parent(
       iterable,
-      $batch,
+      ($batch // $default-batch).Int,
       $auto,
-      $degree,
+      ($degree // $default-degree).Int,
       $stop-after == Inf ?? 0 !! $stop-after,
       'hyperize'
     )
@@ -873,16 +875,16 @@ proto sub racify(|) is export {*}
 multi sub racify(\iterable, $, 1, *%_) is raw { iterable }
 multi sub racify(
          \iterable,
-  Int:D  $batch      = $default-batch,
-  Int:D  $degree     = $default-degree,
-  Bool  :$auto       = True,
+  Int   $batch?,
+  Int   $degree?,
+  Bool :$auto       = True,
         :$stop-after = Inf,
 ) {
     ParaSeq.parent(
       iterable,
-      $batch,
+      ($batch // $default-batch).Int,
       $auto,
-      $degree,
+      ($degree // $default-degree).Int,
       $stop-after == Inf ?? 0 !! $stop-after,
       'racify'
     )
