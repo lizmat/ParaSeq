@@ -131,45 +131,165 @@ as an overall win.
 These methods return a single value that could be considered a reduction
 of the hypered iteration.  In alphabetical order:
 
+=head2 categorize
+
+L<C<.categorize>|https://docs.raku.org/type/List#method_categorize>
+
+=head2 classify
+
+L<C<.classify>|https://docs.raku.org/type/List#method_classify>
+
 =head2 elems
 
-The number of elements that the iteration produced.  Is typically less
-than the number of elements in the source, but can also be more in the
-case of a C<Callable> in a C<.map>.
+The L<C<.elems>|https://docs.raku.org/type/List#routine_elems> method
+returns The number of elements that the iteration produced.  Is typically
+less than the number of elements in the source, but can also be more in
+the case of a C<Callable> in a C<.map>.
 
 =head2 end
 
-The number of C<elems> minus one.
+The L<C<.end>|https://docs.raku.org/type/List#routine_end> method
+return The number of C<.elems> minus one.
 
 =head2 first
 
-Only if C<.first> is called B<without> any arguments, is it an endpoint
-and as such will return the B<first> delivered value.
+Only if the L<C<.first>|https://docs.raku.org/type/List#method_first> is
+called B<without> any arguments, is it an endpoint and as such will
+return the B<first> delivered value.
 
 =head2 head
 
-Only if C<.head> is called B<without> any arguments, is it an endpoint
-and as such will return the B<first> delivered value.
+Only if the L<C<.head>|https://docs.raku.org/type/List#method_head> is
+called B<without> any arguments, is it an endpoint and as such will
+return the B<first> delivered value.
 
 =head2 join
 
+The L<C<.join>|https://docs.raku.org/type/List#routine_join> method
 Joins all delivered values together with the optional separator string
 (which defaults to C<"">).
 
 =head2 reduce
 
-The C<reduce> method is supported, but will only produce the correct
-results if the order of the values in the source is B<not> important to
-determine the final result.
+The L<C<.reduce>|https://docs.raku.org/type/List#routine_reduce> method
+is supported, but will only produce the correct results if the order of
+the values in the source is B<not> important to determine the final
+result.
 
 =head2 sum
 
-Sums all delivered values.  An optimized version of C<.reduce(* + *)>.
+The L<C<.sum>|https://docs.raku.org/type/List#routine_sum> method sums
+all delivered values.  It is an optimized version of C<.reduce(* + *)>.
 
 =head2 tail
 
-Only if C<.tail> is called B<without> any arguments, is it an endpoint
-and as such will return the B<last> delivered value.
+Only if the L<C<.tail>|https://docs.raku.org/type/List#method_tail> is
+called B<without> any arguments, is it an endpoint and as such will
+return the B<last> delivered value.
+
+=head1 INTERFACE METHODS
+
+These methods produce another C<ParaSeq> object that will keep the
+parallelization information so that the possibility for parallelization
+is used whenever possible.
+
+In alphabetical order:
+
+=head2 antipairs
+
+L<C<.antipairs>|https://docs.raku.org/type/List#method_antipairs>
+
+=head2 batch
+
+L<C<.batch>|https://docs.raku.org/type/List#method_batch>
+
+=head2 combinations
+
+L<C<.combinations>|https://docs.raku.org/type/List#method_combinations>
+
+=head2 deepmap
+
+L<C<.deepmap>|https://docs.raku.org/type/Any#method_deepmap>
+
+=head2 duckmap
+
+L<C<.duckmap>|https://docs.raku.org/type/Any#method_duckmap>
+
+=head2 eager
+
+L<C<.eager>|https://docs.raku.org/type/List#method_eager>
+
+=head2 first
+
+L<C<.first>|https://docs.raku.org/type/List#method_first>
+
+=head2 flatmap
+
+L<C<.flatmap>|https://docs.raku.org/type/List#method_flatmap>
+
+=head2 grep
+
+L<C<.grep>|https://docs.raku.org/type/List#method_grep>
+
+=head2 head
+
+L<C<.head>|https://docs.raku.org/type/List#method_head>
+
+=head2 invert
+
+L<C<.invert>|https://docs.raku.org/type/List#method_invert>
+
+=head2 keys
+
+L<C<.keys>|https://docs.raku.org/type/List#method_keys>
+
+=head2 kv
+
+L<C<.kv>|https://docs.raku.org/type/List#method_kv>
+
+=head2 map
+
+L<C<.map>|https://docs.raku.org/type/List#method_map>
+
+=head2 pairs
+
+L<C<.pairs>|https://docs.raku.org/type/List#method_pairs>
+
+=head2 permutations
+
+L<C<.permutations>|https://docs.raku.org/type/List#method_permutations>
+
+=head2 pick
+
+L<C<.pick>|https://docs.raku.org/type/List#method_pick>
+
+=head2 reverse
+
+L<C<.reverse>|https://docs.raku.org/type/List#method_reverse>
+
+=head2 roll
+
+L<C<.roll>|https://docs.raku.org/type/List#method_roll>
+
+=head2 rotate
+
+L<C<.rotate>|https://docs.raku.org/type/List#method_rotate>
+
+=head2 rotor
+
+L<C<.rotor>|https://docs.raku.org/type/List#method_rotor>
+
+=head2 sort
+
+L<C<.sort>|https://docs.raku.org/type/List#method_sort>
+
+=head2 tail
+
+L<C<.tail>|https://docs.raku.org/type/List#method_tail>
+
+=head2 values
+
+L<C<.values>|https://docs.raku.org/type/List#method_values>
 
 =head1 COERCERS
 

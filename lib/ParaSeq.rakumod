@@ -559,20 +559,27 @@ class ParaSeq does Sequence {
 
 #- introspection ---------------------------------------------------------------
 
+    method auto(ParaSeq:D:) { nqp::hllbool($!auto) }
+
+    method batch-sizes(ParaSeq:D:) {
+        self.stats.map(*.processed).minmax
+    }
+
     method default-batch()  { $default-batch  }
     method default-degree() { $default-degree }
 
+    multi method is-lazy(ParaSeq:D:) {
+        nqp::hllbool($!source.is-lazy && nqp::not_i($!stop-after))
+    }
+
     method stats( ParaSeq:D:) { $!result.stats.List }
 
-    method auto(      ParaSeq:D:) { nqp::hllbool($!auto)                    }
-    method stop-after(ParaSeq:D:) { $!stop-after || False                   }
-    method stopped(   ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
+    method stop-after(ParaSeq:D:) { $!stop-after || False }
+
+    method stopped(ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
 
     method threads(ParaSeq:D:) {
         self.stats.map(*.threadid).unique.List
-    }
-    method batch-sizes(ParaSeq:D:) {
-        self.stats.map(*.processed).minmax
     }
 
 #- endpoints -------------------------------------------------------------------
@@ -598,10 +605,6 @@ class ParaSeq does Sequence {
         nqp::eqaddr($value,IE) ?? Nil !! $value
     }
 
-    multi method is-lazy(ParaSeq:D:) {
-        nqp::hllbool($!source.is-lazy && nqp::not_i($!stop-after))
-    }
-
     multi method join(ParaSeq:D: Str:D $joiner = '') {
         self.fail-iterator-cannot-be-lazy('.join') if self.is-lazy;
 
@@ -624,6 +627,9 @@ class ParaSeq does Sequence {
         self!start(&processor).List.join($joiner)
     }
 
+    proto method pick(|) {*}
+    multi method pick(ParaSeq:D:) { self.List.pick }
+
     multi method reduce(ParaSeq:D: Callable:D $reducer) {
 
         # Logic for reducing a buffer
@@ -641,6 +647,9 @@ class ParaSeq does Sequence {
         # Finish off by reducing the reductions
         self!start(&processor).Seq.reduce($reducer)
     }
+
+    proto method roll(|) {*}
+    multi method roll(ParaSeq:D:) { self.List.roll }
 
     multi method sum(ParaSeq:D:) {
         self.fail-iterator-cannot-be-lazy('.sum') if self.is-lazy;
@@ -885,21 +894,62 @@ class ParaSeq does Sequence {
 
 #- other standard Iterable interfaces ------------------------------------------
 
-    multi method invert(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.invert.iterator
+    multi method antipairs(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.antipairs.iterator
     }
 
-    proto method skip(|) {*}
-    multi method skip(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.skip(|c).iterator
+    proto method batch(|) {*}
+    multi method batch(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.batch(|c).iterator
+    }
+
+    multi method combinations(ParaSeq:D: $of) {
+        self!pass-the-chain: self.List.combinations($of).iterator
+    }
+
+    multi method deepmap(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.deepmap(|c).iterator
+    }
+
+    multi method duckmap(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.duckmap(|c).iterator
+    }
+
+    multi method eager(ParaSeq:D:) {
+        self!pass-the-chain: self.List.iterator
     }
 
     multi method head(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.head(|c).iterator
     }
 
-    multi method tail(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.tail(|c).iterator
+    multi method invert(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.invert.iterator
+    }
+
+    multi method flatmap(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.flatmap(|c).iterator
+    }
+
+    multi method keys(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.keys.iterator
+    }
+
+    multi method kv(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.kv.iterator
+    }
+
+    multi method pairs(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.pairs.iterator
+    }
+
+    proto method permutations(|) {*}
+    multi method permutations(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.permutations(|c).iterator
+    }
+
+    multi method pick(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.pick(|c).iterator
     }
 
     multi method reverse(ParaSeq:D:) {
@@ -908,9 +958,38 @@ class ParaSeq does Sequence {
             self.IterationBuffer, Mu
     }
 
+    multi method rotate(ParaSeq:D: $rotate) {
+        self!pass-the-chain: self.List.rotate($rotate).iterator
+    }
+
+    proto method rotor(|) {*}
+    multi method rotor(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.rotor(|c).iterator
+    }
+
+    multi method serial(ParaSeq:D:) { self.Seq }
+
+    proto method skip(|) {*}
+    multi method skip(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.skip(|c).iterator
+    }
+
+    proto method sort(|) {*}
+    multi method sort(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.sort(|c).iterator
+    }
+
+    multi method tail(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.tail(|c).iterator
+    }
+
+    multi method values(ParaSeq:D:) { self }
+
 #- coercers --------------------------------------------------------------------
 
-    multi method Array(ParaSeq:D:) { self.IterationBuffer.List.Array }
+    multi method Array(  ParaSeq:D:) { self.List.Array   }
+    multi method Bag(    ParaSeq:D:) { self.List.Bag     }
+    multi method BagHash(ParaSeq:D:) { self.List.BagHash }
 
     multi method Bool(ParaSeq:D:) {
         my $Bool := nqp::hllbool(
@@ -920,20 +999,28 @@ class ParaSeq does Sequence {
         $Bool
     }
 
-    multi method Hash( ParaSeq:D:) { self.IterationBuffer.List.Hash  }
+    multi method Hash(ParaSeq:D:) { self.List.Hash }
+    multi method Int( ParaSeq:D:) { self.elems     }
 
     multi method IterationBuffer(ParaSeq:D:) {
         self.iterator.push-all(my $buffer := nqp::create(IB));
         $buffer
     }
 
-    multi method List( ParaSeq:D:) { self.IterationBuffer.List     }
-    multi method Map(  ParaSeq:D:) { self.IterationBuffer.List.Map }
+    multi method List(ParaSeq:D:) { self.IterationBuffer.List }
 
-    multi method Seq(  ParaSeq:D:) { Seq.new: self.iterator    }
-    multi method Slip( ParaSeq:D:) { self.IterationBuffer.Slip }
+    multi method Map(    ParaSeq:D:) { self.List.Map     }
+    multi method Mix(    ParaSeq:D:) { self.List.Mix     }
+    multi method MixHash(ParaSeq:D:) { self.List.MixHash }
+          method Numeric(ParaSeq:D:) { self.elems        }
 
-    multi method serial(ParaSeq:D:) { self.Seq }
+    multi method Seq(ParaSeq:D:) { Seq.new: self.iterator }
+
+    multi method Set(    ParaSeq:D:) { self.List.Set     }
+    multi method SetHash(ParaSeq:D:) { self.List.SetHash }
+    multi method Str(    ParaSeq:D:) { self.join(" ")    }
+
+    multi method Slip(ParaSeq:D:) { self.IterationBuffer.Slip }
 }
 
 #- actual interface ------------------------------------------------------------

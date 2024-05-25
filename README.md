@@ -98,45 +98,182 @@ ENDPOINT METHODS
 
 These methods return a single value that could be considered a reduction of the hypered iteration. In alphabetical order:
 
+categorize
+----------
+
+[`.categorize`](https://docs.raku.org/type/List#method_categorize)
+
+classify
+--------
+
+[`.classify`](https://docs.raku.org/type/List#method_classify)
+
 elems
 -----
 
-The number of elements that the iteration produced. Is typically less than the number of elements in the source, but can also be more in the case of a `Callable` in a `.map`.
+The [`.elems`](https://docs.raku.org/type/List#routine_elems) method returns The number of elements that the iteration produced. Is typically less than the number of elements in the source, but can also be more in the case of a `Callable` in a `.map`.
 
 end
 ---
 
-The number of `elems` minus one.
+The [`.end`](https://docs.raku.org/type/List#routine_end) method return The number of `.elems` minus one.
 
 first
 -----
 
-Only if `.first` is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
+Only if the [`.first`](https://docs.raku.org/type/List#method_first) is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
 
 head
 ----
 
-Only if `.head` is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
+Only if the [`.head`](https://docs.raku.org/type/List#method_head) is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
 
 join
 ----
 
-Joins all delivered values together with the optional separator string (which defaults to `""`).
+The [`.join`](https://docs.raku.org/type/List#routine_join) method Joins all delivered values together with the optional separator string (which defaults to `""`).
 
 reduce
 ------
 
-The `reduce` method is supported, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
+The [`.reduce`](https://docs.raku.org/type/List#routine_reduce) method is supported, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
 
 sum
 ---
 
-Sums all delivered values. An optimized version of `.reduce(* + *)`.
+The [`.sum`](https://docs.raku.org/type/List#routine_sum) method sums all delivered values. It is an optimized version of `.reduce(* + *)`.
 
 tail
 ----
 
-Only if `.tail` is called **without** any arguments, is it an endpoint and as such will return the **last** delivered value.
+Only if the [`.tail`](https://docs.raku.org/type/List#method_tail) is called **without** any arguments, is it an endpoint and as such will return the **last** delivered value.
+
+INTERFACE METHODS
+=================
+
+These methods produce another `ParaSeq` object that will keep the parallelization information so that the possibility for parallelization is used whenever possible.
+
+In alphabetical order:
+
+antipairs
+---------
+
+[`.antipairs`](https://docs.raku.org/type/List#method_antipairs)
+
+batch
+-----
+
+[`.batch`](https://docs.raku.org/type/List#method_batch)
+
+combinations
+------------
+
+[`.combinations`](https://docs.raku.org/type/List#method_combinations)
+
+deepmap
+-------
+
+[`.deepmap`](https://docs.raku.org/type/Any#method_deepmap)
+
+duckmap
+-------
+
+[`.duckmap`](https://docs.raku.org/type/Any#method_duckmap)
+
+eager
+-----
+
+[`.eager`](https://docs.raku.org/type/List#method_eager)
+
+first
+-----
+
+[`.first`](https://docs.raku.org/type/List#method_first)
+
+flatmap
+-------
+
+[`.flatmap`](https://docs.raku.org/type/List#method_flatmap)
+
+grep
+----
+
+[`.grep`](https://docs.raku.org/type/List#method_grep)
+
+head
+----
+
+[`.head`](https://docs.raku.org/type/List#method_head)
+
+invert
+------
+
+[`.invert`](https://docs.raku.org/type/List#method_invert)
+
+keys
+----
+
+[`.keys`](https://docs.raku.org/type/List#method_keys)
+
+kv
+--
+
+[`.kv`](https://docs.raku.org/type/List#method_kv)
+
+map
+---
+
+[`.map`](https://docs.raku.org/type/List#method_map)
+
+pairs
+-----
+
+[`.pairs`](https://docs.raku.org/type/List#method_pairs)
+
+permutations
+------------
+
+[`.permutations`](https://docs.raku.org/type/List#method_permutations)
+
+pick
+----
+
+[`.pick`](https://docs.raku.org/type/List#method_pick)
+
+reverse
+-------
+
+[`.reverse`](https://docs.raku.org/type/List#method_reverse)
+
+roll
+----
+
+[`.roll`](https://docs.raku.org/type/List#method_roll)
+
+rotate
+------
+
+[`.rotate`](https://docs.raku.org/type/List#method_rotate)
+
+rotor
+-----
+
+[`.rotor`](https://docs.raku.org/type/List#method_rotor)
+
+sort
+----
+
+[`.sort`](https://docs.raku.org/type/List#method_sort)
+
+tail
+----
+
+[`.tail`](https://docs.raku.org/type/List#method_tail)
+
+values
+------
+
+[`.values`](https://docs.raku.org/type/List#method_values)
 
 COERCERS
 ========
