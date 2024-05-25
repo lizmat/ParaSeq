@@ -101,12 +101,12 @@ These methods return a single value that could be considered a reduction of the 
 categorize
 ----------
 
-[`.categorize`](https://docs.raku.org/type/List#method_categorize)
+[`.categorize`](https://docs.raku.org/type/List#routine_categorize)
 
 classify
 --------
 
-[`.classify`](https://docs.raku.org/type/List#method_classify)
+[`.classify`](https://docs.raku.org/type/List#routine_classify)
 
 elems
 -----
@@ -121,7 +121,7 @@ The [`.end`](https://docs.raku.org/type/List#routine_end) method return The numb
 first
 -----
 
-Only if the [`.first`](https://docs.raku.org/type/List#method_first) is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
+Only if the [`.first`](https://docs.raku.org/type/List#routine_first) is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
 
 head
 ----
@@ -158,7 +158,7 @@ In alphabetical order:
 antipairs
 ---------
 
-[`.antipairs`](https://docs.raku.org/type/List#method_antipairs)
+[`.antipairs`](https://docs.raku.org/type/List#routine_antipairs)
 
 batch
 -----
@@ -168,7 +168,7 @@ batch
 combinations
 ------------
 
-[`.combinations`](https://docs.raku.org/type/List#method_combinations)
+[`.combinations`](https://docs.raku.org/type/List#routine_combinations)
 
 deepmap
 -------
@@ -183,12 +183,12 @@ duckmap
 eager
 -----
 
-[`.eager`](https://docs.raku.org/type/List#method_eager)
+[`.eager`](https://docs.raku.org/type/List#routine_eager)
 
 first
 -----
 
-[`.first`](https://docs.raku.org/type/List#method_first)
+[`.first`](https://docs.raku.org/type/List#routine_first)
 
 flatmap
 -------
@@ -198,7 +198,7 @@ flatmap
 grep
 ----
 
-[`.grep`](https://docs.raku.org/type/List#method_grep)
+[`.grep`](https://docs.raku.org/type/List#routine_grep)
 
 head
 ----
@@ -208,62 +208,62 @@ head
 invert
 ------
 
-[`.invert`](https://docs.raku.org/type/List#method_invert)
+[`.invert`](https://docs.raku.org/type/List#routine_invert)
 
 keys
 ----
 
-[`.keys`](https://docs.raku.org/type/List#method_keys)
+[`.keys`](https://docs.raku.org/type/List#routine_keys)
 
 kv
 --
 
-[`.kv`](https://docs.raku.org/type/List#method_kv)
+[`.kv`](https://docs.raku.org/type/List#routine_kv)
 
 map
 ---
 
-[`.map`](https://docs.raku.org/type/List#method_map)
+[`.map`](https://docs.raku.org/type/List#routine_map)
 
 pairs
 -----
 
-[`.pairs`](https://docs.raku.org/type/List#method_pairs)
+[`.pairs`](https://docs.raku.org/type/List#routine_pairs)
 
 permutations
 ------------
 
-[`.permutations`](https://docs.raku.org/type/List#method_permutations)
+[`.permutations`](https://docs.raku.org/type/List#routine_permutations)
 
 pick
 ----
 
-[`.pick`](https://docs.raku.org/type/List#method_pick)
+[`.pick`](https://docs.raku.org/type/List#routine_pick)
 
 reverse
 -------
 
-[`.reverse`](https://docs.raku.org/type/List#method_reverse)
+[`.reverse`](https://docs.raku.org/type/List#routine_reverse)
 
 roll
 ----
 
-[`.roll`](https://docs.raku.org/type/List#method_roll)
+[`.roll`](https://docs.raku.org/type/List#routine_roll)
 
 rotate
 ------
 
-[`.rotate`](https://docs.raku.org/type/List#method_rotate)
+[`.rotate`](https://docs.raku.org/type/List#routine_rotate)
 
 rotor
 -----
 
-[`.rotor`](https://docs.raku.org/type/List#method_rotor)
+[`.rotor`](https://docs.raku.org/type/List#routine_rotor)
 
 sort
 ----
 
-[`.sort`](https://docs.raku.org/type/List#method_sort)
+[`.sort`](https://docs.raku.org/type/List#routine_sort)
 
 tail
 ----
@@ -273,7 +273,7 @@ tail
 values
 ------
 
-[`.values`](https://docs.raku.org/type/List#method_values)
+[`.values`](https://docs.raku.org/type/List#routine_values)
 
 COERCERS
 ========
@@ -290,31 +290,59 @@ In alphabetical order:
 
   * Array
 
+[`Array`](https://docs.raku.org/type/Array)
+
   * Bag
+
+[`Bag`](https://docs.raku.org/type/Bag)
 
   * BagHash
 
+[`BagHash`](https://docs.raku.org/type/BagHash)
+
   * Bool
+
+[`Bool`](https://docs.raku.org/type/Bool)
 
   * Hash
 
+[`Hash`](https://docs.raku.org/type/Hash)
+
   * IterationBuffer
+
+[`IterationBuffer`](https://docs.raku.org/type/IterationBuffer)
 
   * List
 
+[`List`](https://docs.raku.org/type/List)
+
   * Map
+
+[`Map`](https://docs.raku.org/type/Map)
 
   * Mix
 
+[`Mix`](https://docs.raku.org/type/Mix)
+
   * MixHash
+
+[`MixHash`](https://docs.raku.org/type/MixHash)
 
   * Seq
 
+[`Seq`](https://docs.raku.org/type/Seq)
+
   * Set
+
+[`Set`](https://docs.raku.org/type/Set)
 
   * SetHash
 
+[`SetHash`](https://docs.raku.org/type/SetHash)
+
   * Slip
+
+[`Slip`](https://docs.raku.org/type/Slip)
 
 PUBLIC CLASSES
 ==============

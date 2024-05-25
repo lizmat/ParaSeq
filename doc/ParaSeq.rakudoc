@@ -133,11 +133,11 @@ of the hypered iteration.  In alphabetical order:
 
 =head2 categorize
 
-L<C<.categorize>|https://docs.raku.org/type/List#method_categorize>
+L<C<.categorize>|https://docs.raku.org/type/List#routine_categorize>
 
 =head2 classify
 
-L<C<.classify>|https://docs.raku.org/type/List#method_classify>
+L<C<.classify>|https://docs.raku.org/type/List#routine_classify>
 
 =head2 elems
 
@@ -153,7 +153,7 @@ return The number of C<.elems> minus one.
 
 =head2 first
 
-Only if the L<C<.first>|https://docs.raku.org/type/List#method_first> is
+Only if the L<C<.first>|https://docs.raku.org/type/List#routine_first> is
 called B<without> any arguments, is it an endpoint and as such will
 return the B<first> delivered value.
 
@@ -197,7 +197,7 @@ In alphabetical order:
 
 =head2 antipairs
 
-L<C<.antipairs>|https://docs.raku.org/type/List#method_antipairs>
+L<C<.antipairs>|https://docs.raku.org/type/List#routine_antipairs>
 
 =head2 batch
 
@@ -205,7 +205,7 @@ L<C<.batch>|https://docs.raku.org/type/List#method_batch>
 
 =head2 combinations
 
-L<C<.combinations>|https://docs.raku.org/type/List#method_combinations>
+L<C<.combinations>|https://docs.raku.org/type/List#routine_combinations>
 
 =head2 deepmap
 
@@ -217,11 +217,11 @@ L<C<.duckmap>|https://docs.raku.org/type/Any#method_duckmap>
 
 =head2 eager
 
-L<C<.eager>|https://docs.raku.org/type/List#method_eager>
+L<C<.eager>|https://docs.raku.org/type/List#routine_eager>
 
 =head2 first
 
-L<C<.first>|https://docs.raku.org/type/List#method_first>
+L<C<.first>|https://docs.raku.org/type/List#routine_first>
 
 =head2 flatmap
 
@@ -229,7 +229,7 @@ L<C<.flatmap>|https://docs.raku.org/type/List#method_flatmap>
 
 =head2 grep
 
-L<C<.grep>|https://docs.raku.org/type/List#method_grep>
+L<C<.grep>|https://docs.raku.org/type/List#routine_grep>
 
 =head2 head
 
@@ -237,51 +237,51 @@ L<C<.head>|https://docs.raku.org/type/List#method_head>
 
 =head2 invert
 
-L<C<.invert>|https://docs.raku.org/type/List#method_invert>
+L<C<.invert>|https://docs.raku.org/type/List#routine_invert>
 
 =head2 keys
 
-L<C<.keys>|https://docs.raku.org/type/List#method_keys>
+L<C<.keys>|https://docs.raku.org/type/List#routine_keys>
 
 =head2 kv
 
-L<C<.kv>|https://docs.raku.org/type/List#method_kv>
+L<C<.kv>|https://docs.raku.org/type/List#routine_kv>
 
 =head2 map
 
-L<C<.map>|https://docs.raku.org/type/List#method_map>
+L<C<.map>|https://docs.raku.org/type/List#routine_map>
 
 =head2 pairs
 
-L<C<.pairs>|https://docs.raku.org/type/List#method_pairs>
+L<C<.pairs>|https://docs.raku.org/type/List#routine_pairs>
 
 =head2 permutations
 
-L<C<.permutations>|https://docs.raku.org/type/List#method_permutations>
+L<C<.permutations>|https://docs.raku.org/type/List#routine_permutations>
 
 =head2 pick
 
-L<C<.pick>|https://docs.raku.org/type/List#method_pick>
+L<C<.pick>|https://docs.raku.org/type/List#routine_pick>
 
 =head2 reverse
 
-L<C<.reverse>|https://docs.raku.org/type/List#method_reverse>
+L<C<.reverse>|https://docs.raku.org/type/List#routine_reverse>
 
 =head2 roll
 
-L<C<.roll>|https://docs.raku.org/type/List#method_roll>
+L<C<.roll>|https://docs.raku.org/type/List#routine_roll>
 
 =head2 rotate
 
-L<C<.rotate>|https://docs.raku.org/type/List#method_rotate>
+L<C<.rotate>|https://docs.raku.org/type/List#routine_rotate>
 
 =head2 rotor
 
-L<C<.rotor>|https://docs.raku.org/type/List#method_rotor>
+L<C<.rotor>|https://docs.raku.org/type/List#routine_rotor>
 
 =head2 sort
 
-L<C<.sort>|https://docs.raku.org/type/List#method_sort>
+L<C<.sort>|https://docs.raku.org/type/List#routine_sort>
 
 =head2 tail
 
@@ -289,7 +289,7 @@ L<C<.tail>|https://docs.raku.org/type/List#method_tail>
 
 =head2 values
 
-L<C<.values>|https://docs.raku.org/type/List#method_values>
+L<C<.values>|https://docs.raku.org/type/List#routine_values>
 
 =head1 COERCERS
 
@@ -310,19 +310,61 @@ my $none   = (^1_000_000).Seq.Set;            # no parallelization
 In alphabetical order:
 
 =item Array
+
+L<C<Array>|https://docs.raku.org/type/Array>
+
 =item Bag
+
+L<C<Bag>|https://docs.raku.org/type/Bag>
+
 =item BagHash
+
+L<C<BagHash>|https://docs.raku.org/type/BagHash>
+
 =item Bool
+
+L<C<Bool>|https://docs.raku.org/type/Bool>
+
 =item Hash
+
+L<C<Hash>|https://docs.raku.org/type/Hash>
+
 =item IterationBuffer
+
+L<C<IterationBuffer>|https://docs.raku.org/type/IterationBuffer>
+
 =item List
+
+L<C<List>|https://docs.raku.org/type/List>
+
 =item Map
+
+L<C<Map>|https://docs.raku.org/type/Map>
+
 =item Mix
+
+L<C<Mix>|https://docs.raku.org/type/Mix>
+
 =item MixHash
+
+L<C<MixHash>|https://docs.raku.org/type/MixHash>
+
 =item Seq
+
+L<C<Seq>|https://docs.raku.org/type/Seq>
+
 =item Set
+
+L<C<Set>|https://docs.raku.org/type/Set>
+
 =item SetHash
+
+L<C<SetHash>|https://docs.raku.org/type/SetHash>
+
 =item Slip
+
+L<C<Slip>|https://docs.raku.org/type/Slip>
+
 
 =head1 PUBLIC CLASSES
 
