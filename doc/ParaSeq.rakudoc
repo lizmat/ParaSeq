@@ -114,7 +114,7 @@ There is no functional difference between C<hyperize> and C<racify> as of
 version C<0.0.4>.  So it is only kept to remain compatible with the
 C<hyperize> module.
 
-The decision to remove specific the racing capability was made after
+The decision to remove the specific racing capability was made after
 it became clear that there was a race condition (no pun intended) in
 determining when the iteration was finished.  To fix this deficiency
 would require quite a bit of additional logic, that would slow down
@@ -125,6 +125,84 @@ only one less C<push> / C<shift> per batch, it felt that this would only
 be a small price to pay.  On top of that, removing the feature also means
 two fewer attribute checks per batch as well, so that could be counted
 as an overall win.
+
+=head1 ENDPOINT METHODS
+
+These methods return a single value that could be considered a reduction
+of the hypered iteration.  In alphabetical order:
+
+=head2 elems
+
+The number of elements that the iteration produced.  Is typically less
+than the number of elements in the source, but can also be more in the
+case of a C<Callable> in a C<.map>.
+
+=head2 end
+
+The number of C<elems> minus one.
+
+=head2 first
+
+Only if C<.first> is called B<without> any arguments, is it an endpoint
+and as such will return the B<first> delivered value.
+
+=head2 head
+
+Only if C<.head> is called B<without> any arguments, is it an endpoint
+and as such will return the B<first> delivered value.
+
+=head2 join
+
+Joins all delivered values together with the optional separator string
+(which defaults to C<"">).
+
+=head2 reduce
+
+The C<reduce> method is supported, but will only produce the correct
+results if the order of the values in the source is B<not> important to
+determine the final result.
+
+=head2 sum
+
+Sums all delivered values.  An optimized version of C<.reduce(* + *)>.
+
+=head2 tail
+
+Only if C<.tail> is called B<without> any arguments, is it an endpoint
+and as such will return the B<last> delivered value.
+
+=head1 COERCERS
+
+The following coercers have been optimized as much as possible with
+the use of C<&hyperize>.  Note that these methods are optimized for
+speed, rather than memory usage.  Should you want to optimize for
+memory usage, then put in a `.Seq` coercer first.  Or remove
+C<.&hyperize> completely.  So:
+
+=begin code :lang<raku>
+
+my $speed  = (^1_000_000).&hyperize.Set;      # optimized for speed
+my $memory = (^1_000_000).&hyperize.Seq.Set;  # optimized for memory
+my $none   = (^1_000_000).Seq.Set;            # no parallelization
+
+=end code
+
+In alphabetical order:
+
+=item Array
+=item Bag
+=item BagHash
+=item Bool
+=item Hash
+=item IterationBuffer
+=item List
+=item Map
+=item Mix
+=item MixHash
+=item Seq
+=item Set
+=item SetHash
+=item Slip
 
 =head1 PUBLIC CLASSES
 
@@ -154,6 +232,12 @@ Int.  The default initial batch size: currently C<16>.
 
 Int.  The default maximum number of worker threads to be used.  Currently
 set to the number of available CPUs minus one.
+
+=head3 is-lazy
+
+Bool.  Returns whether the C<ParaSeq> iterator should be considered lazy
+or not.  It will be considered lazy if the source iterator is lazy and
+B<no> value has been specified with C<:stop-after>.
 
 =head3 stats
 
@@ -205,14 +289,6 @@ called with a C<Callable> that produced C<Slip> values.
 
 Int.  The numerical ID of low-level thread that processed the associated
 batch (aka its C<$*THREAD.id>).
-
-=head1 COMPATIBILITY NOTES
-
-=head2 reduce
-
-The C<reduce> method is supported, but will only produce the correct
-results if the order of the values in the source is B<not> important to
-determine the final result.
 
 =head1 IMPROVEMENTS
 

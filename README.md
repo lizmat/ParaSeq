@@ -89,9 +89,95 @@ my %lines = @filenames.&racify(1, :!auto).map: { $_ => .IO.lines.List }
 
 There is no functional difference between `hyperize` and `racify` as of version `0.0.4`. So it is only kept to remain compatible with the `hyperize` module.
 
-The decision to remove specific the racing capability was made after it became clear that there was a race condition (no pun intended) in determining when the iteration was finished. To fix this deficiency would require quite a bit of additional logic, that would slow down execution in both the hypered and racing case.
+The decision to remove the specific racing capability was made after it became clear that there was a race condition (no pun intended) in determining when the iteration was finished. To fix this deficiency would require quite a bit of additional logic, that would slow down execution in both the hypered and racing case.
 
 As the difference in performance between hypering and racing was basically only one less `push` / `shift` per batch, it felt that this would only be a small price to pay. On top of that, removing the feature also means two fewer attribute checks per batch as well, so that could be counted as an overall win.
+
+ENDPOINT METHODS
+================
+
+These methods return a single value that could be considered a reduction of the hypered iteration. In alphabetical order:
+
+elems
+-----
+
+The number of elements that the iteration produced. Is typically less than the number of elements in the source, but can also be more in the case of a `Callable` in a `.map`.
+
+end
+---
+
+The number of `elems` minus one.
+
+first
+-----
+
+Only if `.first` is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
+
+head
+----
+
+Only if `.head` is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
+
+join
+----
+
+Joins all delivered values together with the optional separator string (which defaults to `""`).
+
+reduce
+------
+
+The `reduce` method is supported, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
+
+sum
+---
+
+Sums all delivered values. An optimized version of `.reduce(* + *)`.
+
+tail
+----
+
+Only if `.tail` is called **without** any arguments, is it an endpoint and as such will return the **last** delivered value.
+
+COERCERS
+========
+
+The following coercers have been optimized as much as possible with the use of `&hyperize`. Note that these methods are optimized for speed, rather than memory usage. Should you want to optimize for memory usage, then put in a `.Seq` coercer first. Or remove `.&hyperize` completely. So:
+
+```raku
+my $speed  = (^1_000_000).&hyperize.Set;      # optimized for speed
+my $memory = (^1_000_000).&hyperize.Seq.Set;  # optimized for memory
+my $none   = (^1_000_000).Seq.Set;            # no parallelization
+```
+
+In alphabetical order:
+
+  * Array
+
+  * Bag
+
+  * BagHash
+
+  * Bool
+
+  * Hash
+
+  * IterationBuffer
+
+  * List
+
+  * Map
+
+  * Mix
+
+  * MixHash
+
+  * Seq
+
+  * Set
+
+  * SetHash
+
+  * Slip
 
 PUBLIC CLASSES
 ==============
@@ -118,6 +204,10 @@ Int. The default initial batch size: currently `16`.
 ### default-degree
 
 Int. The default maximum number of worker threads to be used. Currently set to the number of available CPUs minus one.
+
+### is-lazy
+
+Bool. Returns whether the `ParaSeq` iterator should be considered lazy or not. It will be considered lazy if the source iterator is lazy and **no** value has been specified with `:stop-after`.
 
 ### stats
 
@@ -159,14 +249,6 @@ Int. The number of values that were produced in the associated batch. This can b
 ### threadid
 
 Int. The numerical ID of low-level thread that processed the associated batch (aka its `$*THREAD.id`).
-
-COMPATIBILITY NOTES
-===================
-
-reduce
-------
-
-The `reduce` method is supported, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
 
 IMPROVEMENTS
 ============
