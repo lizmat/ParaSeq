@@ -1,0 +1,39 @@
+use Test;
+use ParaSeq;
+
+plan 20;
+
+my constant $elems  = 20;
+my constant @list   = (^$elems).flat;
+
+for &hyperize, &racify -> &paraseq {
+    my $iterator := paraseq(@list).iterator;
+    is $iterator.^name, 'BufferIterator', 'did we get a BufferIterator';
+
+    my @pulled;
+    until (my $pulled := $iterator.pull-one) =:= IterationEnd {
+        @pulled.push($pulled);
+    }
+    is-deeply @pulled.List, @list, 'Did we get the original list back?';
+}
+
+for &hyperize, &racify -> &paraseq {
+    my $iterator := paraseq(@list).iterator;
+
+    $iterator.push-all(my @pulled);
+    is-deeply @pulled.List, @list, 'Did we get the original list back?';
+}
+
+for &hyperize, &racify -> &paraseq {
+    my $iterator := paraseq(@list).iterator;
+
+    is $iterator.pull-one,          0, 'is the first value ok?';
+    is $iterator.skip-at-least(5),  1, 'Can we skip 5 values?';
+    is $iterator.pull-one,          6, 'is the seventh value ok?';
+    is $iterator.skip-at-least(9),  1, 'Can we skip 9 values?';
+    is $iterator.pull-one,         16, 'is the seventeenth value ok?';
+    is $iterator.skip-at-least(4),  0, 'Can we skip 4 values?';
+    is $iterator.pull-one, IterationEnd, 'are we done?';
+}
+
+# vim: expandtab shiftwidth=4

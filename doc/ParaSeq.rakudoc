@@ -16,8 +16,8 @@ say (^Inf).&hyperize.grep(*.is-prime).skip(999999).head;
 say (^Inf).&hyperize(stop-after => 1_000_000).grep(*.is-prime).tail;
 
 # Fetching lines of files, each element containing a List of lines
-my @lines = @filenames.&hyperize(1, :!auto).map(*.lines.List);
-my %lines = @filenames.&racify(1, :!auto).map: { $_ => .lines.List }
+my @lines = @filenames.&hyperize(1, :!auto).map(*.IO.lines.List);
+my %lines = @filenames.&hyperize(1, :!auto).map: { $_ => .IO.lines.List }
 
 =end code
 
@@ -106,19 +106,25 @@ more values than the value given.
 
 =begin code :lang<raku>
 
-my %lines = @filenames.&racify(1, :!auto).map: { $_ => .lines.List }
+my %lines = @filenames.&racify(1, :!auto).map: { $_ => .IO.lines.List }
 
 =end code
 
-The arguments to C<racify> are B<exactly the same> as the arguments to
-C<hyperize>.  But calling C<racify> will B<NOT> ensure that the values
-produced will be in the same order as the values from which they were
-produced.  Depending on the application, this can mean a small but
-potentially significant improvement of throughput.
+There is no functional difference between C<hyperize> and C<racify> as of
+version C<0.0.4>.  So it is only kept to remain compatible with the
+C<hyperize> module.
 
-Situations where one typically would use C<racify>, is when the result
-is ultimately stored in a C<Hash> or a C<Map>, which does not have a
-predictable order of its elements anyway.
+The decision to remove specific the racing capability was made after
+it became clear that there was a race condition (no pun intended) in
+determining when the iteration was finished.  To fix this deficiency
+would require quite a bit of additional logic, that would slow down
+execution in both the hypered and racing case.
+
+As the difference in performance between hypering and racing was basically
+only one less C<push> / C<shift> per batch, it felt that this would only
+be a small price to pay.  On top of that, removing the feature also means
+two fewer attribute checks per batch as well, so that could be counted
+as an overall win.
 
 =head1 PUBLIC CLASSES
 
@@ -148,12 +154,6 @@ Int.  The default initial batch size: currently C<16>.
 
 Int.  The default maximum number of worker threads to be used.  Currently
 set to the number of available CPUs minus one.
-
-=head3 racing
-
-Bool.  Returns C<True> if racing semantics are used for delivering values.
-Otherwise C<False> (indicating hyper semantics, which B<does> guarantee
-the order of delivered values).
 
 =head3 stats
 
@@ -210,9 +210,9 @@ batch (aka its C<$*THREAD.id>).
 
 =head2 reduce
 
-The C<reduce> method is supported in hypered/racing mode, but will only
-produce the correct results if the order of the values in the source
-is B<not> important to determine the final result.
+The C<reduce> method is supported, but will only produce the correct
+results if the order of the values in the source is B<not> important to
+determine the final result.
 
 =head1 IMPROVEMENTS
 

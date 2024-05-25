@@ -48,11 +48,27 @@ my class BufferIterator does Iterator {
           !! $!iterator.pull-one
     }
 
+    method skip-at-least(uint $skipping) {
+
+        # Need to skip more than in initial buffer
+        my uint $elems  = nqp::elems($!buffer);
+        if $skipping > $elems {
+            nqp::setelems($!buffer,0);
+            $!iterator.skip-at-least($skipping - $elems)
+        }
+
+        # Less than in inital buffer, remove so many entries from it
+        else {
+            nqp::splice($!buffer,emptyIB,0,$skipping);
+            1
+        }
+    }
+
     method push-all(\target) {
         nqp::istype(target,IB)
-          ?? nqp::splice(target, $!buffer,nqp::elems(target), 0)
+          ?? nqp::splice(target,$!buffer,nqp::elems(target),0)
           !! $!buffer.iterator.push-all(target);
-        $!buffer := Mu;
+        nqp::setelems($!buffer,0);
 
         $!iterator.push-all(target)
     }
@@ -75,7 +91,6 @@ my class ParaIterator does Iterator {
     has IB        $!stats;      # list with processed ParaStats objects
     has uint      $!batch;      # initial / current batch size
     has uint      $!auto;       # 1 if batch size automatically adjust on load
-    has uint      $!racing;     # 1 if racing, else hypering
     has uint      $!processed;  # number of items processed so far
     has uint      $!produced;   # number of items produced so far
     has uint      $!nsecs;      # nano seconds wallclock used so far
@@ -87,7 +102,6 @@ my class ParaIterator does Iterator {
            \pressure,
       uint $batch,
       uint $auto,
-      uint $racing,
       uint $todo,
     ) {
         my $self := nqp::create(self);
@@ -101,7 +115,6 @@ my class ParaIterator does Iterator {
 
         nqp::bindattr_i($self,ParaIterator,'$!batch', $batch );
         nqp::bindattr_i($self,ParaIterator,'$!auto',  $auto  );
-        nqp::bindattr_i($self,ParaIterator,'$!racing',$racing);
         nqp::bindattr_i($self,ParaIterator,'$!todo',  $todo  );
         $self
     }
@@ -110,7 +123,7 @@ my class ParaIterator does Iterator {
     method !next-batch(\next) {
 
         # Next buffer to be processed
-        my $buffer := $!racing ?? next !! nqp::shift(next);
+        my $buffer := nqp::shift(next);
 
         # Complete shutdown requested
         if nqp::atomicload_i($!stop) {
@@ -200,7 +213,6 @@ my class ParaIterator does Iterator {
     method skip-at-least(uint $skipping) {
         my      $current  := $!current;
         my      $queues   := $!queues;
-        my      $pressure := $!pressure;
         my uint $toskip    = $skipping;
 
         nqp::while(
@@ -216,7 +228,10 @@ my class ParaIterator does Iterator {
             ),
             nqp::if(             # ignored whole buffer, fetch next
               nqp::eqaddr((my $next := nqp::shift($queues)),IE),
-              (return 0)         # really done
+              nqp::stmts(
+                nqp::setelems($!current,0),  # invalidate current contents
+                (return 0)                   # really done
+              )
             ),
             ($toskip = nqp::sub_i($toskip,$elems)),
             ($current := $!current := self!next-batch($next))
@@ -224,15 +239,36 @@ my class ParaIterator does Iterator {
         );
     }
 
-    method push-all(\target) {
+    proto method push-all(|) {*}
+
+    # Optimized version appending to an IterationBuffer
+    multi method push-all(IterationBuffer:D \target) {
         my $current  := $!current;
         my $queues   := $!queues;
-        my $pressure := $!pressure;
 
         nqp::while(
           1,
           nqp::stmts(
-            target.append($current),
+            nqp::splice(target,$current,nqp::elems(target),0),
+            nqp::if(
+              nqp::eqaddr((my $next := nqp::shift($queues)),IE),
+              (return IE),
+              ($current := self!next-batch($next))
+            )
+          )
+        );
+    }
+
+    # Slower generic version that needs to coerce each buffer to a List
+    # to ensure the correct semantics with .append
+    multi method push-all(\target) {
+        my $current  := $!current;
+        my $queues   := $!queues;
+
+        nqp::while(
+          1,
+          nqp::stmts(
+            target.append($current.List),
             nqp::if(
               nqp::eqaddr((my $next := nqp::shift($queues)),IE),
               (return IE),
@@ -254,17 +290,12 @@ my class ParaIterator does Iterator {
         $!parent.stop;                 # stop all threads
     }
 
-    # Add a semaphore to the queue.  When hypering, This is a ParaQueue to
-    # which a fully processed IterationBuffer will be pushed when it is
-    # ready.  This guarantees that the order of the results will be the
-    # order in which this method will be called.  However, when racing
-    # it will just return the queues ParaQueue.  This causes ready
-    # IterationBuffers to be added whenever they're ready, and thus *not*
-    # guarantee the order anymore.
+    # Add a semaphore to the queue.  This is a ParaQueue to which a fully
+    # processed IterationBuffer will be pushed when it is ready.  This
+    # guarantees that the order of the results will be the order in which
+    # this method will be called.
     method semaphore() is implementation-detail {
-        $!racing
-          ?? $!queues
-          !! nqp::push($!queues,nqp::create(ParaQueue))
+        nqp::push($!queues,nqp::create(ParaQueue))
     }
 }
 
@@ -308,7 +339,6 @@ class ParaSeq does Sequence {
     has           $!SCHEDULER;   # $*SCHEDULER to be used
     has uint      $.batch;       # initial batch size, must be > 0
     has uint      $!auto;        # 1 if batch size automatically adjusts
-    has uint      $!racing;      # 1 if racing instead of hypering
     has uint      $.degree;      # number of CPUs, must be > 1
     has uint      $!stop-after;  # stop after these number of values
     has atomicint $!stop;        # stop all processing if 1
@@ -333,8 +363,6 @@ class ParaSeq does Sequence {
 
         # Set it up!
         my $self := nqp::create(self);
-        nqp::bindattr_i($self,ParaSeq,'$!racing',nqp::iseq_s($method,'racify'));
-
         nqp::bindattr_i($self, ParaSeq, '$!batch',      $batch     );
         nqp::bindattr_i($self, ParaSeq, '$!auto',       $auto      );
         nqp::bindattr_i($self, ParaSeq, '$!degree',     $degree    );
@@ -393,7 +421,7 @@ class ParaSeq does Sequence {
           0,
           $first,
           ($!result := ParaIterator.new(
-            self, $pressure, $!batch, $!auto, $!racing, $!stop-after
+            self, $pressure, $!batch, $!auto, $!stop-after
           )).semaphore
         );
 
@@ -537,7 +565,6 @@ class ParaSeq does Sequence {
     method stats( ParaSeq:D:) { $!result.stats.List }
 
     method auto(      ParaSeq:D:) { nqp::hllbool($!auto)                    }
-    method racing(    ParaSeq:D:) { nqp::hllbool($!racing)                  }
     method stop-after(ParaSeq:D:) { $!stop-after || False                   }
     method stopped(   ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
 
@@ -548,12 +575,99 @@ class ParaSeq does Sequence {
         self.stats.map(*.processed).minmax
     }
 
+#- endpoints -------------------------------------------------------------------
+
+    multi method elems(ParaSeq:D:) {
+        self.is-lazy
+          ?? self.fail-iterator-cannot-be-lazy('.elems',"")
+          !! self!count
+    }
+
+    multi method end(ParaSeq:D:) {
+        self.is-lazy
+          ?? self.fail-iterator-cannot-be-lazy('.end',"")
+          !! self!count - 1
+    }
+
+    multi method first(ParaSeq:D:) { self.head }
+
+    proto method head(|) {*}
+    multi method head(ParaSeq:D:) {
+        my $value := self.iterator.pull-one;
+        self.stop;
+        nqp::eqaddr($value,IE) ?? Nil !! $value
+    }
+
+    multi method is-lazy(ParaSeq:D:) {
+        nqp::hllbool($!source.is-lazy && nqp::not_i($!stop-after))
+    }
+
+    multi method join(ParaSeq:D: Str:D $joiner = '') {
+        self.fail-iterator-cannot-be-lazy('.join') if self.is-lazy;
+
+        # Logic for joining a buffer
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
+
+                nqp::push(
+                  (my $output := nqp::create(IB)),
+                  $input.List.join($joiner)
+                );
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Finish off by joining the joined strings
+        self!start(&processor).List.join($joiner)
+    }
+
+    multi method reduce(ParaSeq:D: Callable:D $reducer) {
+
+        # Logic for reducing a buffer
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
+
+                self!batch-done(
+                  $ordinal, $then, $input, $semaphore, $input.reduce($reducer)
+                );
+            }
+        }
+
+        # Finish off by reducing the reductions
+        self!start(&processor).Seq.reduce($reducer)
+    }
+
+    multi method sum(ParaSeq:D:) {
+        self.fail-iterator-cannot-be-lazy('.sum') if self.is-lazy;
+
+        # Logic for summing a buffer
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
+
+                nqp::push((my $output := nqp::create(IB)),$input.List.sum);
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Finish off by summing the sums
+        self!start(&processor).List.sum
+    }
+
+    proto method tail(|) {*}
+    multi method tail(ParaSeq:D:) {
+        self.Seq.tail
+    }
+
 #- first -----------------------------------------------------------------------
 
-    proto method first(|) {*}
-    multi method first(ParaSeq:D:) {
-        self.Seq.first
-    }
     multi method first(ParaSeq:D: Callable:D $matcher) {
         self.Seq.first($matcher, |%_)
     }
@@ -568,7 +682,6 @@ class ParaSeq does Sequence {
 
 #- grep ------------------------------------------------------------------------
 
-    proto method grep(|) {*}
     multi method grep(ParaSeq:D: Callable:D $matcher, :$k, :$kv, :$p) {
         my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset for :k, :kv, :p
@@ -747,7 +860,6 @@ class ParaSeq does Sequence {
 
 #- map -------------------------------------------------------------------------
 
-    proto method map(|) {*}
     multi method map(ParaSeq:D: Callable:D $mapper) {
 
         # Logic for queuing a buffer for map
@@ -773,7 +885,6 @@ class ParaSeq does Sequence {
 
 #- other standard Iterable interfaces ------------------------------------------
 
-    proto method invert(|) {*}
     multi method invert(ParaSeq:D:) {
         self!pass-the-chain: self.Seq.invert.iterator
     }
@@ -783,123 +894,23 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.Seq.skip(|c).iterator
     }
 
-    proto method head(|) {*}
     multi method head(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.head(|c).iterator
     }
 
-    proto method tail(|) {*}
     multi method tail(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.tail(|c).iterator
     }
 
-    proto method reverse(|) {*}
     multi method reverse(ParaSeq:D:) {
         self!pass-the-chain:
           Rakudo::Iterator.ReifiedReverse:
             self.IterationBuffer, Mu
     }
 
-#- endpoints -------------------------------------------------------------------
-
-    multi method elems(ParaSeq:D:) {
-        self.is-lazy
-          ?? self.fail-iterator-cannot-be-lazy('.elems',"")
-          !! self!count
-    }
-
-    multi method end(ParaSeq:D:) {
-        self.is-lazy
-          ?? self.fail-iterator-cannot-be-lazy('.end',"")
-          !! self!count - 1
-    }
-
-    multi method head(ParaSeq:D:) {
-        my $value := self.iterator.pull-one;
-        self.stop;
-        nqp::eqaddr($value,IE) ?? Nil !! $value
-    }
-
-    multi method is-lazy(ParaSeq:D:) {
-        nqp::hllbool($!source.is-lazy && nqp::not_i($!stop-after))
-    }
-
-    multi method join(ParaSeq:D: Str:D $joiner = '') {
-        self.fail-iterator-cannot-be-lazy('.join') if self.is-lazy;
-
-        # Logic for joining a buffer
-        my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
-            $SCHEDULER.cue: {
-                my uint $then = nqp::time;
-
-                nqp::push(
-                  (my $output := nqp::create(IB)),
-                  $input.List.join($joiner)
-                );
-
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
-        # Finish off by joining the joined strings
-        self!start(&processor).List.join($joiner)
-    }
-
-    multi method reduce(ParaSeq:D: Callable:D $reducer) {
-
-        # Logic for reducing a buffer
-        my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
-            $SCHEDULER.cue: {
-                my uint $then = nqp::time;
-
-                self!batch-done(
-                  $ordinal, $then, $input, $semaphore, $input.reduce($reducer)
-                );
-            }
-        }
-
-        # Finish off by reducing the reductions
-        self!start(&processor).Seq.reduce($reducer)
-    }
-
-    multi method sum(ParaSeq:D:) {
-        self.fail-iterator-cannot-be-lazy('.sum') if self.is-lazy;
-
-        # Logic for summing a buffer
-        my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
-            $SCHEDULER.cue: {
-                my uint $then = nqp::time;
-
-                nqp::push((my $output := nqp::create(IB)),$input.List.sum);
-
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
-        # Finish off by summing the sums
-        self!start(&processor).List.sum
-    }
-
-    multi method tail(ParaSeq:D:) {
-        self.Seq.tail
-    }
-
 #- coercers --------------------------------------------------------------------
 
-    multi method IterationBuffer(ParaSeq:D:) {
-        self.iterator.push-all(my $buffer := nqp::create(IB));
-        $buffer
-    }
-
     multi method Array(ParaSeq:D:) { self.IterationBuffer.List.Array }
-    multi method Hash( ParaSeq:D:) { self.IterationBuffer.List.Hash  }
-    multi method List( ParaSeq:D:) { self.IterationBuffer.List       }
-    multi method Map(  ParaSeq:D:) { self.IterationBuffer.List.Map   }
-    multi method Seq(  ParaSeq:D:) { Seq.new: self.iterator          }
-    multi method Slip( ParaSeq:D:) { self.IterationBuffer.Slip       }
 
     multi method Bool(ParaSeq:D:) {
         my $Bool := nqp::hllbool(
@@ -908,6 +919,19 @@ class ParaSeq does Sequence {
         self.stop;
         $Bool
     }
+
+    multi method Hash( ParaSeq:D:) { self.IterationBuffer.List.Hash  }
+
+    multi method IterationBuffer(ParaSeq:D:) {
+        self.iterator.push-all(my $buffer := nqp::create(IB));
+        $buffer
+    }
+
+    multi method List( ParaSeq:D:) { self.IterationBuffer.List     }
+    multi method Map(  ParaSeq:D:) { self.IterationBuffer.List.Map }
+
+    multi method Seq(  ParaSeq:D:) { Seq.new: self.iterator    }
+    multi method Slip( ParaSeq:D:) { self.IterationBuffer.Slip }
 
     multi method serial(ParaSeq:D:) { self.Seq }
 }
@@ -952,42 +976,10 @@ multi sub hyperize(
       !! $list
 }
 
-proto sub racify(|) is export {*}
-multi sub racify(\iterable, $, 1, *%_) is raw { iterable }
-multi sub racify(
-         \iterable,
-  Int   $batch?,
-  Int   $degree?,
-  Bool :$auto       = True,
-       :$stop-after = Inf,
-) {
-    ParaSeq.parent(
-      iterable,
-      ($batch // $default-batch).Int,
-      $auto,
-      ($degree // $default-degree).Int,
-      $stop-after == Inf ?? 0 !! $stop-after,
-      'racify'
-    )
-}
-multi sub racify(
-  List:D $list,
-  Int    $size?,
-  Int    $degree?,
-  Bool  :$auto       = True,
-        :$stop-after = Inf,
-) {
-    my uint $batch = $size // $default-batch;
-    $list.is-lazy || $list.elems > $batch
-      ?? ParaSeq.parent(
-           $list,
-           $batch,
-           $auto,
-           ($degree // $default-degree).Int,
-           $stop-after == Inf ?? 0 !! $stop-after,
-           'racify'
-         )
-      !! $list
-}
+# There doesn't seem to be too much to be gained by supporting an alternate
+# path where the order of the results is *not* preserved, as the difference
+# in implementation is only one nqp::push/nqp::shift less per batch.  So
+# just equate "racify" with "hyperize"
+my constant &racify is export = &hyperize;
 
 # vim: expandtab shiftwidth=4

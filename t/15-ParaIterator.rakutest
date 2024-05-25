@@ -1,0 +1,42 @@
+use Test;
+use ParaSeq;
+
+plan 18;
+
+my constant $elems  = 20;
+my constant @list   = (^$elems).flat;
+
+for &hyperize, &racify -> &paraseq {
+    my $iterator := paraseq(@list).map({ $_ }).iterator;
+    is $iterator.^name, 'ParaIterator', 'did we get a ParaIterator';
+
+    my @pulled;
+    until (my $pulled := $iterator.pull-one) =:= IterationEnd {
+        @pulled.push($pulled);
+    }
+    @pulled := &paraseq =:= &racify
+      ?? @pulled.sort.List
+      !! @pulled.List;
+
+    is-deeply @pulled, @list, 'Did we get the original list back?';
+}
+
+for &hyperize, &racify -> &paraseq {
+    my $iterator := paraseq(@list).map({ $_ }).iterator;
+
+    $iterator.push-all(my @pulled);
+    is-deeply @pulled.List, @list, 'Did we get the original list back?';
+}
+
+for &hyperize, &racify -> &paraseq {
+    my $iterator := paraseq(@list).map({ $_ }).iterator;
+
+    is $iterator.pull-one,          0, 'Is the first value ok?';
+    is $iterator.skip-at-least(5),  1, 'Can we skip 5 values?';
+    is $iterator.pull-one,          6, 'Is the seventh value ok?';
+    is $iterator.skip-at-least(9),  1, 'Can we skip 9 values?';
+    is $iterator.pull-one,         16, 'Is the seventeenth value ok?';
+    is $iterator.skip-at-least(4),  0, 'Does a skip of 4 mean the end?';
+}
+
+# vim: expandtab shiftwidth=4
