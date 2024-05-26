@@ -399,71 +399,88 @@ my $none   = (^1_000_000).Seq.Set;            # no parallelization
 
 In alphabetical order:
 
-  * Array
+Array
+-----
 
 **Status**: the [`Array`](https://docs.raku.org/type/Array) coercer is implemented: it removes all hypering information from its invocant.
 
-  * Bag
+Bag
+---
 
 **Status**: putting together the [`Bag`](https://docs.raku.org/type/Bag) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
-  * BagHash
+BagHash
+-------
 
 **Status**: putting together the [`BagHash`](https://docs.raku.org/type/BagHash) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
-  * Bool
+Bool
+----
 
 **Status**: an optimized version of the [`Bool`](https://docs.raku.org/type/Bool) coercer has been implemented.
 
-  * Hash
+Hash
+----
 
 **Status**: putting together the [`Hash`](https://docs.raku.org/type/Hash) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
-  * Int
+Int
+---
 
 **Status**: an optimized version of the [`Int`](https://docs.raku.org/type/Int) coercer has been implemented.
 
-  * IterationBuffer
+IterationBuffer
+---------------
 
 **Status**: the [`IterationBuffer`](https://docs.raku.org/type/IterationBuffer) method collects the result of the invocant in an `IterationBuffer` and returns that.
 
-  * List
+List
+----
 
 **Status**: the [`List`](https://docs.raku.org/type/List) coercer is implemented: it removes all hypering information from its invocant.
 
-  * Map
+Map
+---
 
 **Status**: putting together the [`Map`](https://docs.raku.org/type/Map) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
-  * Mix
+Mix
+---
 
 **Status**: putting together the [`Mix`](https://docs.raku.org/type/Mix) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
-  * MixHash
+MixHash
+-------
 
 **Status**: putting together the [`MixHash`](https://docs.raku.org/type/MixHash) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
-  * Numeric
+Numeric
+-------
 
 **Status**: an optimized version of the [`Int`](https://docs.raku.org/type/Numeric) coercer has been implemented.
 
-  * Seq
+Seq
+---
 
 **Status**: the [`Seq`](https://docs.raku.org/type/Seq) coercer is implemented: it removes all hypering information from its invocant.
 
-  * Set
+Set
+---
 
 **Status**: putting together the [`Set`](https://docs.raku.org/type/Set) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
-  * SetHash
+SetHash
+-------
 
 **Status**: putting together the [`SetHash`](https://docs.raku.org/type/SetHash) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
-  * Slip
+Slip
+----
 
 **Status**: the [`Slip`](https://docs.raku.org/type/Slip) coercer is implemented: it removes all hypering information from its invocant.
 
-  * Str
+Str
+---
 
 **Status**: an optimized version of the [`Str`](https://docs.raku.org/type/Str) coercer has been implemented.
 

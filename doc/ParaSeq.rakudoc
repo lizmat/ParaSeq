@@ -421,12 +421,12 @@ my $none   = (^1_000_000).Seq.Set;            # no parallelization
 
 In alphabetical order:
 
-=item Array
+=head2 Array
 
 B<Status>: the L<C<Array>|https://docs.raku.org/type/Array> coercer
 is implemented: it removes all hypering information from its invocant.
 
-=item Bag
+=head2 Bag
 
 B<Status>: putting together the
 L<C<Bag>|https://docs.raku.org/type/Bag> of each batch in a correct
@@ -434,7 +434,7 @@ manner, would be complicated and potentially CPU intensive.
 Therefore, B<no> specific hypering logic has been added for this
 coercer at this point.
 
-=item BagHash
+=head2 BagHash
 
 B<Status>: putting together the
 L<C<BagHash>|https://docs.raku.org/type/BagHash> of each batch in a
@@ -442,13 +442,13 @@ correct manner, would be complicated and potentially CPU intensive.
 Therefore, B<no> specific hypering logic has been added for this
 coercer at this point.
 
-=item Bool
+=head2 Bool
 
 B<Status>: an optimized version of the
 L<C<Bool>|https://docs.raku.org/type/Bool> coercer has been
 implemented.
 
-=item Hash
+=head2 Hash
 
 B<Status>: putting together the
 L<C<Hash>|https://docs.raku.org/type/Hash> of each batch in a
@@ -456,24 +456,24 @@ correct manner, would be complicated and potentially CPU intensive.
 Therefore, B<no> specific hypering logic has been added for this
 coercer at this point.
 
-=item Int
+=head2 Int
 
 B<Status>: an optimized version of the
 L<C<Int>|https://docs.raku.org/type/Int> coercer has been implemented.
 
-=item IterationBuffer
+=head2 IterationBuffer
 
 B<Status>: the
 L<C<IterationBuffer>|https://docs.raku.org/type/IterationBuffer>
 method collects the result of the invocant in an C<IterationBuffer>
 and returns that.
 
-=item List
+=head2 List
 
 B<Status>: the L<C<List>|https://docs.raku.org/type/List> coercer
 is implemented: it removes all hypering information from its invocant.
 
-=item Map
+=head2 Map
 
 B<Status>: putting together the
 L<C<Map>|https://docs.raku.org/type/Map> of each batch in a
@@ -481,7 +481,7 @@ correct manner, would be complicated and potentially CPU intensive.
 Therefore, B<no> specific hypering logic has been added for this
 coercer at this point.
 
-=item Mix
+=head2 Mix
 
 B<Status>: putting together the
 L<C<Mix>|https://docs.raku.org/type/Mix> of each batch in a
@@ -489,7 +489,7 @@ correct manner, would be complicated and potentially CPU intensive.
 Therefore, B<no> specific hypering logic has been added for this
 coercer at this point.
 
-=item MixHash
+=head2 MixHash
 
 B<Status>: putting together the
 L<C<MixHash>|https://docs.raku.org/type/MixHash> of each batch in a
@@ -497,18 +497,18 @@ correct manner, would be complicated and potentially CPU intensive.
 Therefore, B<no> specific hypering logic has been added for this
 coercer at this point.
 
-=item Numeric
+=head2 Numeric
 
 B<Status>: an optimized version of the
 L<C<Int>|https://docs.raku.org/type/Numeric> coercer has been
 implemented.
 
-=item Seq
+=head2 Seq
 
 B<Status>: the L<C<Seq>|https://docs.raku.org/type/Seq> coercer
 is implemented: it removes all hypering information from its invocant.
 
-=item Set
+=head2 Set
 
 B<Status>: putting together the
 L<C<Set>|https://docs.raku.org/type/Set> of each batch in a
@@ -516,7 +516,7 @@ correct manner, would be complicated and potentially CPU intensive.
 Therefore, B<no> specific hypering logic has been added for this
 coercer at this point.
 
-=item SetHash
+=head2 SetHash
 
 B<Status>: putting together the
 L<C<SetHash>|https://docs.raku.org/type/SetHash> of each batch in a
@@ -524,12 +524,12 @@ correct manner, would be complicated and potentially CPU intensive.
 Therefore, B<no> specific hypering logic has been added for this
 coercer at this point.
 
-=item Slip
+=head2 Slip
 
 B<Status>: the L<C<Slip>|https://docs.raku.org/type/Slip> coercer
 is implemented: it removes all hypering information from its invocant.
 
-=item Str
+=head2 Str
 
 B<Status>: an optimized version of the
 L<C<Str>|https://docs.raku.org/type/Str> coercer has been implemented.
