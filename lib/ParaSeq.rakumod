@@ -1093,9 +1093,13 @@ class ParaSeq does Sequence {
         sub processor(uint $ordinal, $input, $semaphore) {
             $SCHEDULER.cue: {
                 my uint $then = nqp::time;
+                my      $output := nqp::create(IB);
 
-                $input.unique(|c).iterator.push-all(
-                  my $output := nqp::create(IB)
+                my $iterator := $input.Seq.unique(|c).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
+                    || nqp::atomicload_i($!stop),
+                  nqp::push($output,$pulled)
                 );
 
                 self!batch-done($ordinal, $then, $input, $semaphore, $output);
