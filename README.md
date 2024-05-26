@@ -110,6 +110,8 @@ categorize
 
 The [`.categorize`](https://docs.raku.org/type/List#routine_categorize) method returns a `Hash` with the expected categorization.
 
+Status: since this method is producing a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated. Therefore, **no** specific hypering logic has been added for this method at this point.
+
 classify
 --------
 

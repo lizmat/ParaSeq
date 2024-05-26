@@ -1,0 +1,23 @@
+use Test;
+use ParaSeq;
+
+plan 4;
+
+my constant @cards  = <A♣ 10♣ 6♥ 3♦ A♠ 3♣ K♠ J♥ 6♦ Q♠ K♥ 8♦ 5♠>;
+my constant $simple = *.comb;
+my constant $hand   = @cards.categorize($simple);
+my constant @list   = (^1000).List;
+my constant $multi  = *.comb.map({ +$_, 10 + $_});
+my constant $levels = @list.categorize($multi);
+my constant $batch  = 4;
+
+for 1, ParaSeq.default-degree {
+    is-deeply @cards.&hyperize($batch, $_).categorize($simple),
+      $hand,
+      ".categorize with degree $_";
+    is-deeply @list.&hyperize($batch, $_).categorize($multi),
+      $levels,
+      "multi level .categorize with degree $_";
+}
+
+# vim: expandtab shiftwidth=4

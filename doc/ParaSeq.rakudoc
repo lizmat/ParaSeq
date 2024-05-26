@@ -145,6 +145,11 @@ specific hypering would only slow down execution.
 The L<C<.categorize>|https://docs.raku.org/type/List#routine_categorize>
 method returns a C<Hash> with the expected categorization.
 
+Status: since this method is producing a Hash, putting together the
+C<Hash> results of each batch in a correct manner, would be very
+complicated.  Therefore, B<no> specific hypering logic has been
+added for this method at this point.
+
 =head2 classify
 
 The L<C<.classify>|https://docs.raku.org/type/List#routine_classify>
