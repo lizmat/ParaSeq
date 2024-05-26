@@ -8,7 +8,7 @@ plan 2;
 my constant @list  = (^200000).List;
 my constant $batch = 16;
 my constant $type  = @list.are;
-my constant $bool  = @list.are(Int);
+#my constant $bool  = @list.are(Int);  # after 2024.05
 
 for 1, ParaSeq.default-degree {
     is-deeply @list.&hyperize($batch, $_).are, $type,
