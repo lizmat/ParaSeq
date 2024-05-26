@@ -1,0 +1,23 @@
+use Test;
+use ParaSeq;
+
+plan 4;
+
+my constant @cards  = <A♣ 10♣ 6♥ 3♦ A♠ 3♣ K♠ J♥ 6♦ Q♠ K♥ 8♦ 5♠>;
+my constant $simple = *.substr(*-1);
+my constant $suits  = @cards.classify($simple);
+my constant @list   = (1000 .. 1999).List;
+my constant $multi  = *.comb;
+my constant $levels = @list.classify($multi);
+my constant $batch  = 4;
+
+for 1, ParaSeq.default-degree {
+    is-deeply @cards.&hyperize($batch, $_).classify($simple),
+      $suits,
+      ".classify with degree $_";
+    is-deeply @list.&hyperize($batch, $_).classify($multi),
+      $levels,
+      "multi level .classify with degree $_";
+}
+
+# vim: expandtab shiftwidth=4

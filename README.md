@@ -110,12 +110,14 @@ categorize
 
 The [`.categorize`](https://docs.raku.org/type/List#routine_categorize) method returns a `Hash` with the expected categorization.
 
-Status: since this method is producing a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated. Therefore, **no** specific hypering logic has been added for this method at this point.
+Status: since the `.categorize` method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
 
 classify
 --------
 
 The [`.classify`](https://docs.raku.org/type/List#routine_classify) method returns a `Hash` with the expected classification.
+
+Status: since the `.classify` method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
 
 elems
 -----
