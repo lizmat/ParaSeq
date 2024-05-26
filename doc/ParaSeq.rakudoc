@@ -137,6 +137,9 @@ The L<C<.are>|https://docs.raku.org/type/Any#method_are> method returns
 either the most restrictive type, or a C<Bool> if a test for a specific
 type was requested.
 
+Status: since this method is already B<highly> optimized, adding
+specific hypering would only slow down execution.
+
 =head2 categorize
 
 The L<C<.categorize>|https://docs.raku.org/type/List#routine_categorize>

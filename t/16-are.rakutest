@@ -1,0 +1,20 @@
+#use v6.*;  # after 2024.05
+use Test;
+use ParaSeq;
+
+plan 2;
+#plan 4;  # after 2024.05
+
+my constant @list  = (^200000).List;
+my constant $batch = 16;
+my constant $type  = @list.are;
+my constant $bool  = @list.are(Int);
+
+for 1, ParaSeq.default-degree {
+    is-deeply @list.&hyperize($batch, $_).are, $type,
+      ".are with degree $_";
+#    is-deeply @list.&hyperize($batch, $_).are(Int), $bool,  # after 2024.05
+#      ".are(Int) with degree $_";
+}
+
+# vim: expandtab shiftwidth=4

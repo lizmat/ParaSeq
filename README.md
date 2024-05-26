@@ -103,6 +103,8 @@ are
 
 The [`.are`](https://docs.raku.org/type/Any#method_are) method returns either the most restrictive type, or a `Bool` if a test for a specific type was requested.
 
+Status: since this method is already **highly** optimized, adding specific hypering would only slow down execution.
+
 categorize
 ----------
 

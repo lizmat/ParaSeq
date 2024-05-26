@@ -585,9 +585,6 @@ class ParaSeq does Sequence {
 
 #- endpoints -------------------------------------------------------------------
 
-    multi method are(ParaSeq:D:      ) { self.Seq.are        }
-    multi method are(ParaSeq:D: \type) { self.Seq.are(\type) }
-
     multi method elems(ParaSeq:D:) {
         self.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.elems',"")
