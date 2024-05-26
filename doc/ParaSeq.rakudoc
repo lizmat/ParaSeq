@@ -131,13 +131,21 @@ as an overall win.
 These methods return a single value that could be considered a reduction
 of the hypered iteration.  In alphabetical order:
 
+=head2 are
+
+The L<C<.are>|https://docs.raku.org/type/Any#method_are> method returns
+either the most restrictive type, or a C<Bool> if a test for a specific
+type was requested.
+
 =head2 categorize
 
-L<C<.categorize>|https://docs.raku.org/type/List#routine_categorize>
+The L<C<.categorize>|https://docs.raku.org/type/List#routine_categorize>
+method returns a C<Hash> with the expected categorization.
 
 =head2 classify
 
-L<C<.classify>|https://docs.raku.org/type/List#routine_classify>
+The L<C<.classify>|https://docs.raku.org/type/List#routine_classify>
+method returns a C<Hash> with the expected classification.
 
 =head2 elems
 
@@ -166,8 +174,24 @@ return the B<first> delivered value.
 =head2 join
 
 The L<C<.join>|https://docs.raku.org/type/List#routine_join> method
-Joins all delivered values together with the optional separator string
+joins all delivered values together with the optional separator string
 (which defaults to C<"">).
+
+=head2 max
+
+The L<C<.max>|https://docs.raku.org/type/Any#routine_max> method, when
+called B<without> any named arguments, provides the maximum value.
+
+=head2 min
+
+The L<C<.min>|https://docs.raku.org/type/Any#routine_min> method, when
+called B<without> any named arguments, provides the minimum value.
+
+=head2 minmax
+
+The L<C<.minmax>|https://docs.raku.org/type/Any#routine_minmax> method,
+when called B<without> any named arguments, provides a C<Range> with
+the minimum value and the maximum value as endpoints.
 
 =head2 reduce
 
@@ -203,6 +227,10 @@ L<C<.antipairs>|https://docs.raku.org/type/List#routine_antipairs>
 
 L<C<.batch>|https://docs.raku.org/type/List#method_batch>
 
+=head2 collate
+
+L<C<.collate>|https://docs.raku.org/type/Any#method_collate>
+
 =head2 combinations
 
 L<C<.combinations>|https://docs.raku.org/type/List#routine_combinations>
@@ -222,6 +250,10 @@ L<C<.eager>|https://docs.raku.org/type/List#routine_eager>
 =head2 first
 
 L<C<.first>|https://docs.raku.org/type/List#routine_first>
+
+=head2 flat
+
+L<C<.flat>|https://docs.raku.org/type/Any#method_flat>
 
 =head2 flatmap
 
@@ -251,6 +283,30 @@ L<C<.kv>|https://docs.raku.org/type/List#routine_kv>
 
 L<C<.map>|https://docs.raku.org/type/List#routine_map>
 
+=head2 max
+
+L<C<.max>|https://docs.raku.org/type/Any#routine_max>
+
+=head2 maxpairs
+
+L<C<.maxpairs>|https://docs.raku.org/type/Any#routine_maxpairs>
+
+=head2 min
+
+L<C<.min>|https://docs.raku.org/type/Any#routine_min>
+
+=head2 minmax
+
+L<C<.minmax>|https://docs.raku.org/type/Any#routine_minmax>
+
+=head2 minpairs
+
+L<C<.minpairs>|https://docs.raku.org/type/Any#routine_minpairs>
+
+=head2 nodemap
+
+L<C<.nodemap>|https://docs.raku.org/type/Any#method_nodemap>
+
 =head2 pairs
 
 L<C<.pairs>|https://docs.raku.org/type/List#routine_pairs>
@@ -262,6 +318,14 @@ L<C<.permutations>|https://docs.raku.org/type/List#routine_permutations>
 =head2 pick
 
 L<C<.pick>|https://docs.raku.org/type/List#routine_pick>
+
+=head2 produce
+
+L<C<.produce>|https://docs.raku.org/type/Any#routine_produce>
+
+=head2 repeated
+
+L<C<.repeated>|https://docs.raku.org/type/Any#method_repeated>
 
 =head2 reverse
 
@@ -279,13 +343,33 @@ L<C<.rotate>|https://docs.raku.org/type/List#routine_rotate>
 
 L<C<.rotor>|https://docs.raku.org/type/List#routine_rotor>
 
+=head2 slice
+
+L<C<.slice>|https://docs.raku.org/type/Seq#multi_method_slice>
+
+=head2 snitch
+
+L<C<.snitch>|https://docs.raku.org/type/Any#routine_snitch>
+
 =head2 sort
 
 L<C<.sort>|https://docs.raku.org/type/List#routine_sort>
 
+=head2 squish
+
+L<C<.squish>|https://docs.raku.org/type/Any#method_squish>
+
 =head2 tail
 
 L<C<.tail>|https://docs.raku.org/type/List#method_tail>
+
+=head2 toggle
+
+L<C<.toggle>|https://docs.raku.org/type/Any#method_toggle>
+
+=head2 unique
+
+L<C<.unique>|https://docs.raku.org/type/Any#method_unique>
 
 =head2 values
 
@@ -329,6 +413,10 @@ L<C<Bool>|https://docs.raku.org/type/Bool>
 
 L<C<Hash>|https://docs.raku.org/type/Hash>
 
+=item Int
+
+L<C<Int>|https://docs.raku.org/type/Int>
+
 =item IterationBuffer
 
 L<C<IterationBuffer>|https://docs.raku.org/type/IterationBuffer>
@@ -349,6 +437,10 @@ L<C<Mix>|https://docs.raku.org/type/Mix>
 
 L<C<MixHash>|https://docs.raku.org/type/MixHash>
 
+=item Numeric
+
+L<C<Numeric>|https://docs.raku.org/type/Numeric>
+
 =item Seq
 
 L<C<Seq>|https://docs.raku.org/type/Seq>
@@ -365,6 +457,9 @@ L<C<SetHash>|https://docs.raku.org/type/SetHash>
 
 L<C<Slip>|https://docs.raku.org/type/Slip>
 
+=item Str
+
+L<C<Str>|https://docs.raku.org/type/Str>
 
 =head1 PUBLIC CLASSES
 

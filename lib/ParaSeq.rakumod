@@ -1,5 +1,6 @@
 # Intended to be as fast as possible and to someday become part of the
 # Rakudo core
+use v6.*;
 use nqp;
 
 my uint $default-batch  = 16;
@@ -584,6 +585,9 @@ class ParaSeq does Sequence {
 
 #- endpoints -------------------------------------------------------------------
 
+    multi method are(ParaSeq:D:      ) { self.Seq.are        }
+    multi method are(ParaSeq:D: \type) { self.Seq.are(\type) }
+
     multi method elems(ParaSeq:D:) {
         self.is-lazy
           ?? self.fail-iterator-cannot-be-lazy('.elems',"")
@@ -626,6 +630,15 @@ class ParaSeq does Sequence {
         # Finish off by joining the joined strings
         self!start(&processor).List.join($joiner)
     }
+
+    proto method max(|) {*}
+    multi method max(ParaSeq:D: &by = &[cmp]) { self.Seq.max(&by) }
+
+    proto method min(|) {*}
+    multi method min(ParaSeq:D: &by = &[cmp]) { self.Seq.min(&by) }
+
+    proto method minmax(|) {*}
+    multi method minmax(ParaSeq:D: &by = &[cmp]) { self.Seq.minmax(&by) }
 
     proto method pick(|) {*}
     multi method pick(ParaSeq:D:) { self.List.pick }
@@ -903,6 +916,11 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.List.batch(|c).iterator
     }
 
+    proto method collate(|) {*}
+    multi method collate(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.collate(|c).iterator
+    }
+
     multi method combinations(ParaSeq:D: $of) {
         self!pass-the-chain: self.List.combinations($of).iterator
     }
@@ -919,16 +937,21 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.List.iterator
     }
 
+    multi method flat(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.flat.iterator
+    }
+
+    proto method flatmap(|) {*}
+    multi method flatmap(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.flatmap(|c).iterator
+    }
+
     multi method head(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.head(|c).iterator
     }
 
     multi method invert(ParaSeq:D:) {
         self!pass-the-chain: self.Seq.invert.iterator
-    }
-
-    multi method flatmap(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.flatmap(|c).iterator
     }
 
     multi method keys(ParaSeq:D:) {
@@ -939,8 +962,56 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.Seq.kv.iterator
     }
 
+    multi method max(ParaSeq:D: &by = &[cmp], :$k!) {
+        $k
+          ?? self!pass-the-chain(self.Seq.max(&by, :k))
+          !! self.max(&by, |%_)
+    }
+    multi method max(ParaSeq:D: &by = &[cmp], :$kv!) {
+        $kv
+          ?? self!pass-the-chain(self.Seq.max(&by, :kv))
+          !! self.max(&by, |%_)
+    }
+    multi method max(ParaSeq:D: &by = &[cmp], :$p!) {
+        $p
+          ?? self!pass-the-chain(self.Seq.max(&by, :p))
+          !! self.max(&by, |%_)
+    }
+
+    multi method min(ParaSeq:D: &by = &[cmp], :$k!) {
+        $k
+          ?? self!pass-the-chain(self.Seq.min(&by, :k))
+          !! self.min(&by, |%_)
+    }
+    multi method min(ParaSeq:D: &by = &[cmp], :$kv!) {
+        $kv
+          ?? self!pass-the-chain(self.Seq.min(&by, :kv))
+          !! self.min(&by, |%_)
+    }
+    multi method min(ParaSeq:D: &by = &[cmp], :$p!) {
+        $p
+          ?? self!pass-the-chain(self.Seq.min(&by, :p))
+          !! self.min(&by, |%_)
+    }
+
+    multi method maxpairs(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.maxpairs.iterator
+    }
+
+    multi method minpairs(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.minpairs.iterator
+    }
+
+    multi method nodemap(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.nodemap(|c).iterator
+    }
+
     multi method pairs(ParaSeq:D:) {
         self!pass-the-chain: self.Seq.pairs.iterator
+    }
+
+    multi method pairup(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.pairup.iterator
     }
 
     proto method permutations(|) {*}
@@ -950,6 +1021,15 @@ class ParaSeq does Sequence {
 
     multi method pick(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.pick(|c).iterator
+    }
+
+    multi method produce(ParaSeq:D: Callable:D $producer) {
+        self!pass-the-chain: self.Seq.produce($producer).iterator
+    }
+
+    proto method repeated(|) {*}
+    multi method repeated(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.repeated(|c).iterator
     }
 
     multi method reverse(ParaSeq:D:) {
@@ -974,13 +1054,43 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.Seq.skip(|c).iterator
     }
 
+    proto method slice(|) {*}
+    multi method slice(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.slice(|c).iterator
+    }
+
+    proto method snip(|) {*}
+    multi method snip(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.snip(|c).iterator
+    }
+
+    proto method snitch(|) {*}
+    multi method snitch(ParaSeq:D: &snitcher = &note) {
+        self!pass-the-chain: self.Seq.snitch(&snitch).iterator
+    }
+
     proto method sort(|) {*}
     multi method sort(ParaSeq:D: |c) {
         self!pass-the-chain: self.List.sort(|c).iterator
     }
 
+    proto method squish(|) {*}
+    multi method squish(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.squish(|c).iterator
+    }
+
     multi method tail(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.tail(|c).iterator
+    }
+
+    proto method toggle(|) {*}
+    multi method toggle(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.toggle(|c).iterator
+    }
+
+    proto method unique(|) {*}
+    multi method unique(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.unique(|c).iterator
     }
 
     multi method values(ParaSeq:D:) { self }
@@ -1018,9 +1128,10 @@ class ParaSeq does Sequence {
 
     multi method Set(    ParaSeq:D:) { self.List.Set     }
     multi method SetHash(ParaSeq:D:) { self.List.SetHash }
-    multi method Str(    ParaSeq:D:) { self.join(" ")    }
+    multi method Supply( ParaSeq:D:) { self.List.Supply  }
 
     multi method Slip(ParaSeq:D:) { self.IterationBuffer.Slip }
+    multi method Str( ParaSeq:D:) { self.join(" ")            }
 }
 
 #- actual interface ------------------------------------------------------------

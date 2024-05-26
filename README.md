@@ -98,15 +98,20 @@ ENDPOINT METHODS
 
 These methods return a single value that could be considered a reduction of the hypered iteration. In alphabetical order:
 
+are
+---
+
+The [`.are`](https://docs.raku.org/type/Any#method_are) method returns either the most restrictive type, or a `Bool` if a test for a specific type was requested.
+
 categorize
 ----------
 
-[`.categorize`](https://docs.raku.org/type/List#routine_categorize)
+The [`.categorize`](https://docs.raku.org/type/List#routine_categorize) method returns a `Hash` with the expected categorization.
 
 classify
 --------
 
-[`.classify`](https://docs.raku.org/type/List#routine_classify)
+The [`.classify`](https://docs.raku.org/type/List#routine_classify) method returns a `Hash` with the expected classification.
 
 elems
 -----
@@ -131,7 +136,22 @@ Only if the [`.head`](https://docs.raku.org/type/List#method_head) is called **w
 join
 ----
 
-The [`.join`](https://docs.raku.org/type/List#routine_join) method Joins all delivered values together with the optional separator string (which defaults to `""`).
+The [`.join`](https://docs.raku.org/type/List#routine_join) method joins all delivered values together with the optional separator string (which defaults to `""`).
+
+max
+---
+
+The [`.max`](https://docs.raku.org/type/Any#routine_max) method, when called **without** any named arguments, provides the maximum value.
+
+min
+---
+
+The [`.min`](https://docs.raku.org/type/Any#routine_min) method, when called **without** any named arguments, provides the minimum value.
+
+minmax
+------
+
+The [`.minmax`](https://docs.raku.org/type/Any#routine_minmax) method, when called **without** any named arguments, provides a `Range` with the minimum value and the maximum value as endpoints.
 
 reduce
 ------
@@ -165,6 +185,11 @@ batch
 
 [`.batch`](https://docs.raku.org/type/List#method_batch)
 
+collate
+-------
+
+[`.collate`](https://docs.raku.org/type/Any#method_collate)
+
 combinations
 ------------
 
@@ -189,6 +214,11 @@ first
 -----
 
 [`.first`](https://docs.raku.org/type/List#routine_first)
+
+flat
+----
+
+[`.flat`](https://docs.raku.org/type/Any#method_flat)
 
 flatmap
 -------
@@ -225,6 +255,36 @@ map
 
 [`.map`](https://docs.raku.org/type/List#routine_map)
 
+max
+---
+
+[`.max`](https://docs.raku.org/type/Any#routine_max)
+
+maxpairs
+--------
+
+[`.maxpairs`](https://docs.raku.org/type/Any#routine_maxpairs)
+
+min
+---
+
+[`.min`](https://docs.raku.org/type/Any#routine_min)
+
+minmax
+------
+
+[`.minmax`](https://docs.raku.org/type/Any#routine_minmax)
+
+minpairs
+--------
+
+[`.minpairs`](https://docs.raku.org/type/Any#routine_minpairs)
+
+nodemap
+-------
+
+[`.nodemap`](https://docs.raku.org/type/Any#method_nodemap)
+
 pairs
 -----
 
@@ -239,6 +299,16 @@ pick
 ----
 
 [`.pick`](https://docs.raku.org/type/List#routine_pick)
+
+produce
+-------
+
+[`.produce`](https://docs.raku.org/type/Any#routine_produce)
+
+repeated
+--------
+
+[`.repeated`](https://docs.raku.org/type/Any#method_repeated)
 
 reverse
 -------
@@ -260,15 +330,40 @@ rotor
 
 [`.rotor`](https://docs.raku.org/type/List#routine_rotor)
 
+slice
+-----
+
+[`.slice`](https://docs.raku.org/type/Seq#multi_method_slice)
+
+snitch
+------
+
+[`.snitch`](https://docs.raku.org/type/Any#routine_snitch)
+
 sort
 ----
 
 [`.sort`](https://docs.raku.org/type/List#routine_sort)
 
+squish
+------
+
+[`.squish`](https://docs.raku.org/type/Any#method_squish)
+
 tail
 ----
 
 [`.tail`](https://docs.raku.org/type/List#method_tail)
+
+toggle
+------
+
+[`.toggle`](https://docs.raku.org/type/Any#method_toggle)
+
+unique
+------
+
+[`.unique`](https://docs.raku.org/type/Any#method_unique)
 
 values
 ------
@@ -308,6 +403,10 @@ In alphabetical order:
 
 [`Hash`](https://docs.raku.org/type/Hash)
 
+  * Int
+
+[`Int`](https://docs.raku.org/type/Int)
+
   * IterationBuffer
 
 [`IterationBuffer`](https://docs.raku.org/type/IterationBuffer)
@@ -328,6 +427,10 @@ In alphabetical order:
 
 [`MixHash`](https://docs.raku.org/type/MixHash)
 
+  * Numeric
+
+[`Numeric`](https://docs.raku.org/type/Numeric)
+
   * Seq
 
 [`Seq`](https://docs.raku.org/type/Seq)
@@ -343,6 +446,10 @@ In alphabetical order:
   * Slip
 
 [`Slip`](https://docs.raku.org/type/Slip)
+
+  * Str
+
+[`Str`](https://docs.raku.org/type/Str)
 
 PUBLIC CLASSES
 ==============
