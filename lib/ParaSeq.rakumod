@@ -1087,7 +1087,23 @@ class ParaSeq does Sequence {
 
     proto method unique(|) {*}
     multi method unique(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.unique(|c).iterator
+
+        # Logic for queuing a buffer for unique
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
+
+                $input.unique(|c).iterator.push-all(
+                  my $output := nqp::create(IB)
+                );
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Post-process the "per-batch" unique values to get final uniqueness
+        self!start(&processor).Seq.unique(|c)
     }
 
     multi method values(ParaSeq:D:) { self }

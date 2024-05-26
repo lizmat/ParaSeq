@@ -379,7 +379,7 @@ toggle
 unique
 ------
 
-[`.unique`](https://docs.raku.org/type/Any#method_unique)
+**Status**: an optimized version of the [`.unique`](https://docs.raku.org/type/Any#method_unique) method has been implemented.
 
 values
 ------

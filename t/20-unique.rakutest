@@ -1,0 +1,29 @@
+use Test;
+use ParaSeq;
+
+plan 12;
+
+my constant $elems    = 5000;
+my constant $list     = (^$elems).List;
+my constant $batch    = 16;
+my constant $unique   = $list.unique.List;
+my constant $as       = * div 100;
+my constant $hundreds = $list.unique(:$as).List;
+my constant $same     = (1 xx $elems).List;
+my constant $one      = $same.unique.List;
+
+for 1, ParaSeq.default-degree {
+    for &[===], &[==] -> $with {
+        is-deeply $list.&hyperize($batch, $_).unique(:$with).List,
+          $unique,
+          "list.unique with degree = $_ with $with.name()";
+        is-deeply $list.&hyperize($batch, $_).unique(:$with, :$as).List,
+          $hundreds,
+          "list.unique(:as(* div 100)) with degree = $_ with $with.name()";
+        is-deeply $same.&hyperize($batch, $_).unique(:$with).List,
+          $one,
+          "same.unique with degree = $_ with $with.name()";
+    }
+}
+
+# vim: expandtab shiftwidth=4
