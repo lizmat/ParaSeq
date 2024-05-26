@@ -1119,16 +1119,15 @@ class ParaSeq does Sequence {
     multi method Map(    ParaSeq:D:) { self.List.Map     }
     multi method Mix(    ParaSeq:D:) { self.List.Mix     }
     multi method MixHash(ParaSeq:D:) { self.List.MixHash }
-          method Numeric(ParaSeq:D:) { self.elems        }
 
-    multi method Seq(ParaSeq:D:) { Seq.new: self.iterator }
+    method Numeric(ParaSeq:D:) { self.elems }
 
-    multi method Set(    ParaSeq:D:) { self.List.Set     }
-    multi method SetHash(ParaSeq:D:) { self.List.SetHash }
-    multi method Supply( ParaSeq:D:) { self.List.Supply  }
-
-    multi method Slip(ParaSeq:D:) { self.IterationBuffer.Slip }
-    multi method Str( ParaSeq:D:) { self.join(" ")            }
+    multi method Seq(    ParaSeq:D:) { Seq.new: self.iterator    }
+    multi method Set(    ParaSeq:D:) { self.List.Set             }
+    multi method SetHash(ParaSeq:D:) { self.List.SetHash         }
+    multi method Slip(   ParaSeq:D:) { self.IterationBuffer.Slip }
+    multi method Str(    ParaSeq:D:) { self.join(" ")            }
+    multi method Supply( ParaSeq:D:) { self.List.Supply          }
 }
 
 #- actual interface ------------------------------------------------------------

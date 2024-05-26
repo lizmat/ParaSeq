@@ -1,0 +1,57 @@
+use Test;
+use ParaSeq;
+
+plan 30;
+
+my constant @list  = (^200000).List;
+my constant $batch = 16;
+my constant $Array   = @list.Array;
+my constant $Bag     = @list.Bag;
+my constant $BagHash = @list.BagHash;
+my constant $Bool    = @list.Bool;
+my constant $Hash    = @list.Hash;
+my constant $Int     = @list.Int;
+my constant $Map     = @list.Map;
+my constant $Mix     = @list.Mix;
+my constant $MixHash = @list.MixHash;
+my constant $Numeric = @list.Numeric;
+my constant $Seq     = @list.Seq;
+my constant $Set     = @list.Set;
+my constant $SetHash = @list.SetHash;
+my constant $Str     = @list.Str;
+my constant $Supply  = @list.Supply;
+
+for 1, ParaSeq.default-degree {
+    is-deeply @list.&hyperize($batch, $_).Array,
+      $Array, ".Array with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Bag,
+      $Bag, ".Bag with degree $_";
+    is-deeply @list.&hyperize($batch, $_).BagHash,
+      $BagHash, ".BagHash with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Bool,
+      $Bool, ".Bool with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Hash,
+      $Hash, ".Hash with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Int,
+      $Int, ".Int with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Map,
+      $Map, ".Map with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Mix,
+      $Mix, ".Mix with degree $_";
+    is-deeply @list.&hyperize($batch, $_).MixHash,
+      $MixHash, ".MixHash with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Numeric,
+      $Numeric, ".Numeric with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Seq,
+      $Seq, ".Seq with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Set,
+      $Set, ".Set with degree $_";
+    is-deeply @list.&hyperize($batch, $_).SetHash,
+      $SetHash, ".SetHash with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Str,
+      $Str, ".Str with degree $_";
+    is-deeply @list.&hyperize($batch, $_).Supply,
+      $Supply, ".Supply with degree $_";
+}
+
+# vim: expandtab shiftwidth=4

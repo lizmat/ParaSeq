@@ -103,46 +103,56 @@ are
 
 The [`.are`](https://docs.raku.org/type/Any#method_are) method returns either the most restrictive type, or a `Bool` if a test for a specific type was requested.
 
-Status: since this method is already **highly** optimized, adding specific hypering would only slow down execution.
+**Status**: since this method is already **highly** optimized, adding specific hypering would only slow down execution.
 
 categorize
 ----------
 
 The [`.categorize`](https://docs.raku.org/type/List#routine_categorize) method returns a `Hash` with the expected categorization.
 
-Status: since the `.categorize` method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
+**Status**: since the `.categorize` method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
 
 classify
 --------
 
 The [`.classify`](https://docs.raku.org/type/List#routine_classify) method returns a `Hash` with the expected classification.
 
-Status: since the `.classify` method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
+**Status**: since the `.classify` method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
 
 elems
 -----
 
 The [`.elems`](https://docs.raku.org/type/List#routine_elems) method returns The number of elements that the iteration produced. Is typically less than the number of elements in the source, but can also be more in the case of a `Callable` in a `.map`.
 
+**Status**: an optimized version of the `.elems` method has been implemented.
+
 end
 ---
 
 The [`.end`](https://docs.raku.org/type/List#routine_end) method return The number of `.elems` minus one.
+
+**Status**: an optimized version of the `.end` method has been implemented.
 
 first
 -----
 
 Only if the [`.first`](https://docs.raku.org/type/List#routine_first) is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
 
+**Status**: an optimized version of the `.first` method without any arguments, has been implemented.
+
 head
 ----
 
 Only if the [`.head`](https://docs.raku.org/type/List#method_head) is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
 
+**Status**: an optimized version of the `.head` method without any arguments, has been implemented.
+
 join
 ----
 
 The [`.join`](https://docs.raku.org/type/List#routine_join) method joins all delivered values together with the optional separator string (which defaults to `""`).
+
+**Status**: an optimized version of the `.join` method has been implemented.
 
 max
 ---
@@ -391,71 +401,71 @@ In alphabetical order:
 
   * Array
 
-[`Array`](https://docs.raku.org/type/Array)
+**Status**: the [`Array`](https://docs.raku.org/type/Array) coercer is implemented: it removes all hypering information from its invocant.
 
   * Bag
 
-[`Bag`](https://docs.raku.org/type/Bag)
+**Status**: putting together the [`Bag`](https://docs.raku.org/type/Bag) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
   * BagHash
 
-[`BagHash`](https://docs.raku.org/type/BagHash)
+**Status**: putting together the [`BagHash`](https://docs.raku.org/type/BagHash) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
   * Bool
 
-[`Bool`](https://docs.raku.org/type/Bool)
+**Status**: an optimized version of the [`Bool`](https://docs.raku.org/type/Bool) coercer has been implemented.
 
   * Hash
 
-[`Hash`](https://docs.raku.org/type/Hash)
+**Status**: putting together the [`Hash`](https://docs.raku.org/type/Hash) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
   * Int
 
-[`Int`](https://docs.raku.org/type/Int)
+**Status**: an optimized version of the [`Int`](https://docs.raku.org/type/Int) coercer has been implemented.
 
   * IterationBuffer
 
-[`IterationBuffer`](https://docs.raku.org/type/IterationBuffer)
+**Status**: the [`IterationBuffer`](https://docs.raku.org/type/IterationBuffer) method collects the result of the invocant in an `IterationBuffer` and returns that.
 
   * List
 
-[`List`](https://docs.raku.org/type/List)
+**Status**: the [`List`](https://docs.raku.org/type/List) coercer is implemented: it removes all hypering information from its invocant.
 
   * Map
 
-[`Map`](https://docs.raku.org/type/Map)
+**Status**: putting together the [`Map`](https://docs.raku.org/type/Map) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
   * Mix
 
-[`Mix`](https://docs.raku.org/type/Mix)
+**Status**: putting together the [`Mix`](https://docs.raku.org/type/Mix) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
   * MixHash
 
-[`MixHash`](https://docs.raku.org/type/MixHash)
+**Status**: putting together the [`MixHash`](https://docs.raku.org/type/MixHash) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
   * Numeric
 
-[`Numeric`](https://docs.raku.org/type/Numeric)
+**Status**: an optimized version of the [`Int`](https://docs.raku.org/type/Numeric) coercer has been implemented.
 
   * Seq
 
-[`Seq`](https://docs.raku.org/type/Seq)
+**Status**: the [`Seq`](https://docs.raku.org/type/Seq) coercer is implemented: it removes all hypering information from its invocant.
 
   * Set
 
-[`Set`](https://docs.raku.org/type/Set)
+**Status**: putting together the [`Set`](https://docs.raku.org/type/Set) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
   * SetHash
 
-[`SetHash`](https://docs.raku.org/type/SetHash)
+**Status**: putting together the [`SetHash`](https://docs.raku.org/type/SetHash) of each batch in a correct manner, would be complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this coercer at this point.
 
   * Slip
 
-[`Slip`](https://docs.raku.org/type/Slip)
+**Status**: the [`Slip`](https://docs.raku.org/type/Slip) coercer is implemented: it removes all hypering information from its invocant.
 
   * Str
 
-[`Str`](https://docs.raku.org/type/Str)
+**Status**: an optimized version of the [`Str`](https://docs.raku.org/type/Str) coercer has been implemented.
 
 PUBLIC CLASSES
 ==============
