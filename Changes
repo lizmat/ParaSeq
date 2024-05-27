@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.0.5  2024-05-27T17:23:14+02:00
     - Added a *lot* of methods, at least as stubs for now
     - Added documentation about all methods supported, and their status
     - Implement specific support for .unique
