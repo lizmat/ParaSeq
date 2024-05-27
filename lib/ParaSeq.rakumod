@@ -1131,7 +1131,35 @@ class ParaSeq does Sequence {
     }
 
     multi method pairs(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.pairs.iterator
+        my $SCHEDULER := $!SCHEDULER;
+        my uint $base;  # base offset
+
+        # Logic for queuing a buffer for .keys
+        sub processor(uint $ordinal, $input is raw, $semaphore) {
+            my uint $offset = $base;
+            my uint $elems  = nqp::elems($input);
+            $base = $base + $elems;
+
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                # Store the Pairs as fast as possible, no stop check needed
+                my uint $i;
+                nqp::while(
+                  $i < $elems,
+                  nqp::push(
+                    $output,
+                    Pair.new($offset + $i,nqp::atpos($input,$i++))
+                  )
+                );
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Let's go!
+        self!start(&processor)
     }
 
     multi method pairup(ParaSeq:D:) {

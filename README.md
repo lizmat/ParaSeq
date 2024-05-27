@@ -304,7 +304,7 @@ nodemap
 pairs
 -----
 
-[`.pairs`](https://docs.raku.org/type/List#routine_pairs)
+**Status**: an optimized version of the [`.pairs`](https://docs.raku.org/type/List#routine_pairs) method has been implemented.
 
 permutations
 ------------

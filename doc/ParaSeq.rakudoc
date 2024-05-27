@@ -342,7 +342,9 @@ L<C<.nodemap>|https://docs.raku.org/type/Any#method_nodemap>
 
 =head2 pairs
 
-L<C<.pairs>|https://docs.raku.org/type/List#routine_pairs>
+B<Status>: an optimized version of the
+L<C<.pairs>|https://docs.raku.org/type/List#routine_pairs> method
+has been implemented.
 
 =head2 permutations
 
