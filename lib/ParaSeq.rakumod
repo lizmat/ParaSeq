@@ -1056,10 +1056,6 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.Seq.invert.iterator
     }
 
-    multi method keys(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.keys.iterator
-    }
-
     multi method kv(ParaSeq:D:) {
         self!pass-the-chain: self.Seq.kv.iterator
     }

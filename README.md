@@ -259,7 +259,7 @@ invert
 keys
 ----
 
-[`.keys`](https://docs.raku.org/type/List#routine_keys)
+**Status**: the [`.keys`](https://docs.raku.org/type/List#routine_keys) method is already very simple, and adding hypering overhead would do just that: add overhead. Therefore, **no** specific hypering logic has been added for this method.
 
 kv
 --

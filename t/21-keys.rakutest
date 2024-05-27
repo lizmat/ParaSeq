@@ -1,0 +1,16 @@
+use Test;
+use ParaSeq;
+
+plan 2;
+
+my constant $elems    = 10000;
+my constant $list     = (^$elems).pick(*).List;
+my constant $batch    = 16;
+my constant $keys     = $list.keys.List;
+
+for 1, ParaSeq.default-degree {
+    is-deeply $list.&hyperize($batch, $_).keys.List, $keys,
+      ".keys with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4
