@@ -571,10 +571,12 @@ class ParaSeq does Sequence {
     # Entry point in chain, from an Iterator
     method !pass-the-chain(\source) {
         my $self := nqp::create(self);
-        nqp::bindattr_i($self, ParaSeq, '$!degree',    $!degree   );
-        nqp::bindattr_i($self, ParaSeq, '$!batch',     $!batch    );
-        nqp::bindattr(  $self, ParaSeq, '$!SCHEDULER', $!SCHEDULER);
-        nqp::bindattr(  $self, ParaSeq, '$!source',    source     );
+        nqp::bindattr_i($self, ParaSeq, '$!degree',     $!degree    );
+        nqp::bindattr_i($self, ParaSeq, '$!batch',      $!batch     );
+        nqp::bindattr_i($self, ParaSeq, '$!auto',       $!auto      );
+        nqp::bindattr_i($self, ParaSeq, '$!stop-after', $!stop-after);
+        nqp::bindattr(  $self, ParaSeq, '$!SCHEDULER',  $!SCHEDULER );
+        nqp::bindattr(  $self, ParaSeq, '$!source',     source      );
         $self
     }
 
