@@ -14,12 +14,16 @@ my sub granularity(&callable) {
     $count == Inf ?? 1 !! $count
 }
 
+# Helper sub to return the positional argument as fast as possible
+my sub identity(\value) is raw { value }
+
 # Shortcut for long names, just for esthetics
 my constant IB = IterationBuffer;
 my constant IE = IterationEnd;
 
 # An empty IterationBuffer, for various places where it is needed as a source
-my constant emptyIB = nqp::create(IB);
+my constant emptyIB   = nqp::create(IB);
+my constant emptyList = emptyIB.List;
 
 #- ParaQueue -------------------------------------------------------------------
 # A blocking concurrent queue to which one can nqp::push and from which one
@@ -74,7 +78,108 @@ my class BufferIterator does Iterator {
         $!iterator.push-all(target)
     }
 
-    method stats(--> emptyIB) { }
+    method stats(--> emptyList) { }
+}
+
+#- WhichIterator -------------------------------------------------------------
+# An iterator that takes a buffer filled with values on even locations, and
+# .WHICH strings on odd values, and produces just the values on the even
+# positions
+
+my class WhichIterator does Iterator {
+    has $!buffer;    # buffer to produce from
+
+    method new(\buffer) {
+        my $self := nqp::create(self);
+        nqp::bindattr($self,WhichIterator,'$!buffer',buffer);
+        $self
+    }
+
+    method pull-one() {
+        my $buffer := $!buffer;
+
+        nqp::if(
+          nqp::elems($buffer),
+          nqp::stmts(
+            (my $pulled := nqp::shift($buffer)),
+            nqp::shift($buffer),
+            $pulled
+          ),
+          IterationEnd
+        )
+    }
+
+    method skip-at-least(uint $skipping is copy) {
+        $skipping = $skipping + $skipping;
+
+        nqp::if(
+          $skipping > nqp::elems($!buffer),
+          0,
+          nqp::stmts(
+            nqp::splice($!buffer,emptyIB,0,$skipping),
+            1
+          )
+        )
+    }
+
+    method push-all(\target --> IterationEnd) {
+        my $buffer := $!buffer;
+
+        nqp::while(
+          nqp::elems($buffer),
+          nqp::stmts(
+            nqp::push(target,nqp::shift($buffer)),
+            nqp::shift($buffer)
+          )
+        );
+    }
+
+    method stats(--> emptyList) { }
+}
+
+#- UniqueIterator --------------------------------------------------------------
+# A variation on the WhichIterator that also takes a hash with lookup status
+# If a key exists in the seen hash, and the value is > 0, then it is the first
+# time this value is produced.  In that case, produce the value and set the
+# value in the hash to 0 (indicating any further occurrences should be ignored
+
+my class UniqueIterator does Iterator {
+    has $!seen;    # lookup hash: value > 1 means first, so pass, 0 means skip
+    has $!buffer;  # buffer with value / key alternates
+
+    method new(\seen, \buffer) {
+        my $self := nqp::create(self);
+        nqp::bindattr(
+          $self,UniqueIterator,'$!seen',nqp::getattr(seen,Map,'$!storage')
+        );
+        nqp::bindattr($self,UniqueIterator,'$!buffer',buffer);
+        $self
+    }
+
+    method pull-one() {
+        my $seen   := $!seen;
+        my $buffer := $!buffer;
+
+        nqp::while(
+          nqp::elems($buffer),
+          nqp::stmts(
+            (my $pulled := nqp::shift($buffer)),
+            nqp::if(
+              nqp::existskey($seen,(my str $key = nqp::shift($buffer))),
+              nqp::if(
+                nqp::atkey($seen,$key),
+                nqp::stmts(
+                  nqp::bindkey($seen,$key,0),
+                  (return $pulled)
+                )
+              ),
+              (return $pulled)
+            )
+          )
+        );
+
+        IterationEnd
+    }
 }
 
 #- ParaIterator ----------------------------------------------------------------
@@ -1085,29 +1190,170 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.Seq.toggle(|c).iterator
     }
 
+    # The unique method uses a 2 stage approach: the first stage is having
+    # all the threads produce "their" unique values, with a "seen" hash for
+    # each thread that was being used.  The second stage then post-processes
+    # the entire result, making sure that a value that was seen by more than
+    # one thread *still* would only be produced once, with the first value
+    # seen (when using a specific :as modifier)
     proto method unique(|) {*}
-    multi method unique(ParaSeq:D: |c) {
+    multi method unique(ParaSeq:D: :with(&op) = &[===], :&as = &identity) {
 
-        # Logic for queuing a buffer for unique
         my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
+        my $hashes    := nqp::create(IB);  # list of hashes, keyed on threadid
+        my $lock      := Lock.new;
+
+        # Logic for queuing a buffer for unique WITHOUT an infix op
+        sub processor-without(uint $ordinal, $input is raw, $semaphore) {
+
             $SCHEDULER.cue: {
                 my uint $then = nqp::time;
                 my      $output := nqp::create(IB);
 
-                my $iterator := $input.Seq.unique(|c).iterator;
+                my int $i = nqp::threadid(nqp::currentthread);
+                my $seen := $lock.protect: {
+                    nqp::ifnull(
+                      nqp::atpos($hashes,$i),
+                      nqp::bindpos($hashes,$i,nqp::hash)
+                    )
+                }
+
+                my int $m = nqp::elems($input);
+                $i = 0;
                 nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
-                  nqp::push($output,$pulled)
+                  $i == $m || nqp::atomicload_i($!stop),
+                  nqp::unless(
+                    nqp::existskey(
+                      $seen,
+                      (my str $key = as(
+                        my $value := nqp::atpos($input,$i++)
+                      ).WHICH)
+                    ),
+                    nqp::stmts(
+                      nqp::bindkey($seen,$key,1),
+                      nqp::push($output,$value),
+                      nqp::push($output,nqp::clone($key))
+                    )
+                  )
                 );
 
                 self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
-        # Post-process the "per-batch" unique values to get final uniqueness
-        self!start(&processor).Seq.unique(|c)
+        # Logic for queuing a buffer for unique WITH an infix op
+        sub processor-with(uint $ordinal, $input is raw, $semaphore) {
+
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
+                my      $output := nqp::create(IB);
+
+                # Get the seen hash for this thread
+                my int $i = nqp::threadid(nqp::currentthread);
+                my $seen := $lock.protect: {
+                    nqp::ifnull(
+                      nqp::atpos($hashes,$i),
+                      nqp::bindpos($hashes,$i,nqp::hash)
+                    )
+                }
+
+                # Process all values
+                my int $m = nqp::elems($input);
+                $i = 0;
+                nqp::until(
+                  $i == $m || nqp::atomicload_i($!stop),
+                  nqp::unless(
+                    nqp::existskey(
+                      $seen,
+                      (my str $key = as(
+                        my $value := nqp::atpos($input,$i++)
+                      ).WHICH)
+                    ),
+                    nqp::stmts(
+                      nqp::bindkey($seen,$key,1),
+                      (my int $j = 0),
+                      (my int $n = nqp::elems($output)),
+                      nqp::until(  # check all values for match using op(x,y)
+                        $j == $n || op(nqp::atpos($output,$j), $value),
+                        $j = nqp::add_i($j,2)
+                      ),
+                      nqp::if(
+                        $j == $n,
+                        nqp::stmts(  # not found with op(x,y) either, so add
+                          nqp::push($output,$value),
+                          nqp::push($output,nqp::clone($key))
+                        )
+                      )
+                    )
+                  )
+                );
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Start the process and fill buffer with initial result
+        self!start(
+          nqp::eqaddr(&op,&[===]) ?? &processor-without !! &processor-with
+        ).iterator.push-all(my $result := nqp::create(IB));
+
+        # Get rid of the empty slots, caused by threadids of threads that did
+        # *not* run any uniquing logic
+        my $seens := nqp::create(IB);
+        nqp::while(
+          nqp::elems($hashes),
+          nqp::unless(
+            nqp::isnull(my $hash := nqp::shift($hashes)),
+            nqp::push($seens,$hash)
+          )
+        );
+
+        # If there was only one hash with seen information, there was only
+        # one thread doing it, and so we've done all the checking that we
+        # need already
+        if nqp::elems($seens) == 1 {
+            self!pass-the-chain: WhichIterator.new($result)
+        }
+
+        # Multiple threads processed values
+        else {
+            # Merge all the seen hashes into a single one, with value 0 for
+            # the values that were seen in only a single thread, and 1 and
+            # higher for values that were seen in multiple threads
+            my $seen := nqp::hash;
+            nqp::while(
+              nqp::elems($seens),
+              nqp::stmts(
+                (my $iter := nqp::iterator(nqp::shift($seens))),
+                nqp::while(
+                  $iter,
+                  nqp::stmts(
+                    (my str $key = nqp::iterkey_s(nqp::shift($iter))),
+                    nqp::bindkey(
+                      $seen,
+                      $key,
+                      nqp::add_i(nqp::ifnull(nqp::atkey($seen,$key),-1),1)
+                    )
+                  )
+                )
+              )
+            );
+
+            # Now remove all of the values that only were seen in a single
+            # thread: we're sure that these only occur once in the result
+            $iter := nqp::iterator($seen);
+            nqp::while(
+              $iter,
+              nqp::unless(
+                nqp::iterval(nqp::shift($iter)),
+                nqp::deletekey($seen,nqp::iterkey_s($iter))
+              )
+            );
+
+            self!pass-the-chain: nqp::elems($seen)
+              ?? UniqueIterator.new($seen, $result)  # need further checks
+              !! WhichIterator.new($result)          # all ok
+        }
     }
 
     multi method values(ParaSeq:D:) { self }

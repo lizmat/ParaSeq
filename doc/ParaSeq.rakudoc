@@ -401,6 +401,9 @@ B<Status>: an optimized version of the
 L<C<.unique>|https://docs.raku.org/type/Any#method_unique> method
 has been implemented.
 
+B<Caveat>: using the C<:with> option with an operator that checks for
+B<inequality>, may produce erroneous results.
+
 =head2 values
 
 L<C<.values>|https://docs.raku.org/type/List#routine_values>

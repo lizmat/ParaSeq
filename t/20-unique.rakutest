@@ -3,8 +3,8 @@ use ParaSeq;
 
 plan 12;
 
-my constant $elems    = 5000;
-my constant $list     = (^$elems).List;
+my constant $elems    = 10000;
+my constant $list     = (^$elems).pick(*).List;
 my constant $batch    = 16;
 my constant $unique   = $list.unique.List;
 my constant $as       = * div 100;
