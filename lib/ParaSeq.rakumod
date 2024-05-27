@@ -788,9 +788,7 @@ class ParaSeq does Sequence {
     }
 
     proto method tail(|) {*}
-    multi method tail(ParaSeq:D:) {
-        self.Seq.tail
-    }
+    multi method tail(ParaSeq:D:) { self.List.tail }
 
 #- first -----------------------------------------------------------------------
 
@@ -1261,8 +1259,8 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.Seq.squish(|c).iterator
     }
 
-    multi method tail(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.tail(|c).iterator
+    multi method tail(ParaSeq:D: $what) {
+        self!pass-the-chain: self.List.tail($what).iterator
     }
 
     proto method toggle(|) {*}
