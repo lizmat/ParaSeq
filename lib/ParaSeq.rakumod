@@ -1076,8 +1076,8 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.Seq.flatmap(|c).iterator
     }
 
-    multi method head(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.head(|c).iterator
+    multi method head(ParaSeq:D: $what) {
+        self!pass-the-chain: self.Seq.head($what).iterator
     }
 
     multi method invert(ParaSeq:D:) {
