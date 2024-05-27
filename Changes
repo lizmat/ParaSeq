@@ -5,6 +5,7 @@ Revision history for ParaSeq
     - Updated status of ".keys" and added tests
     - Added optimized ".kv" and tests
     - Added optimized ".pairs" and tests
+    - Added optimized ".antipairs" and tests
 
 0.0.5  2024-05-27T17:23:14+02:00
     - Added a *lot* of methods, at least as stubs for now

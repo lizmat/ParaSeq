@@ -249,7 +249,9 @@ In alphabetical order:
 
 =head2 antipairs
 
+B<Status>: an optimized version of the
 L<C<.antipairs>|https://docs.raku.org/type/List#routine_antipairs>
+method has been implemented.
 
 =head2 batch
 

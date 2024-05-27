@@ -194,7 +194,7 @@ In alphabetical order:
 antipairs
 ---------
 
-[`.antipairs`](https://docs.raku.org/type/List#routine_antipairs)
+**Status**: an optimized version of the [`.antipairs`](https://docs.raku.org/type/List#routine_antipairs) method has been implemented.
 
 batch
 -----
