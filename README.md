@@ -436,6 +436,11 @@ IterationBuffer
 
 **Status**: the [`IterationBuffer`](https://docs.raku.org/type/IterationBuffer) method collects the result of the invocant in an `IterationBuffer` and returns that.
 
+list
+----
+
+**Status**: the [`list`](https://docs.raku.org/routine/list) coercer is implemented: it removes all hypering information from its invocant.
+
 List
 ----
 

@@ -473,6 +473,11 @@ L<C<IterationBuffer>|https://docs.raku.org/type/IterationBuffer>
 method collects the result of the invocant in an C<IterationBuffer>
 and returns that.
 
+=head2 list
+
+B<Status>: the L<C<list>|https://docs.raku.org/routine/list> coercer
+is implemented: it removes all hypering information from its invocant.
+
 =head2 List
 
 B<Status>: the L<C<List>|https://docs.raku.org/type/List> coercer

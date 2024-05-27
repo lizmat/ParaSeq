@@ -1,6 +1,7 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+    - Added "list" coercer
 
 0.0.5  2024-05-27T17:23:14+02:00
     - Added a *lot* of methods, at least as stubs for now

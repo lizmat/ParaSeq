@@ -1380,6 +1380,7 @@ class ParaSeq does Sequence {
         $buffer
     }
 
+    multi method list(ParaSeq:D:) { self.IterationBuffer.List }
     multi method List(ParaSeq:D:) { self.IterationBuffer.List }
 
     multi method Map(    ParaSeq:D:) { self.List.Map     }

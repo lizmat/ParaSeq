@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 30;
+plan 34;
 
 my constant @list  = (^200000).List;
 my constant $batch = 16;
@@ -34,6 +34,10 @@ for 1, ParaSeq.default-degree {
       $Hash, ".Hash with degree $_";
     is-deeply @list.&hyperize($batch, $_).Int,
       $Int, ".Int with degree $_";
+    is-deeply @list.&hyperize($batch, $_).list,
+      @list, ".list with degree $_";
+    is-deeply @list.&hyperize($batch, $_).List,
+      @list, ".List with degree $_";
     is-deeply @list.&hyperize($batch, $_).Map,
       $Map, ".Map with degree $_";
     is-deeply @list.&hyperize($batch, $_).Mix,
