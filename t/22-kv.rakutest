@@ -6,11 +6,11 @@ plan 2;
 my constant $elems = 200000;
 my constant $list  = (^$elems).pick(*).List;
 my constant $batch = 16;
-my constant $keys  = $list.keys.List;
+my constant $kv    = $list.kv.List;
 
 for 1, ParaSeq.default-degree {
-    is-deeply $list.&hyperize($batch, $_).keys.List, $keys,
-      ".keys with degree = $_";
+    is-deeply $list.&hyperize($batch, $_).kv.List, $kv,
+      ".kv with degree = $_";
 }
 
 # vim: expandtab shiftwidth=4

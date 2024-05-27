@@ -1,13 +1,14 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
-    - Added "list" coercer
-    - Update status of "keys" and add tests
+    - Added ".list" coercer
+    - Updated status of ".keys" and add tests
+    - Added optimized ".kv" and add tests
 
 0.0.5  2024-05-27T17:23:14+02:00
     - Added a *lot* of methods, at least as stubs for now
     - Added documentation about all methods supported, and their status
-    - Implement specific support for .unique
+    - Added optimized ".unique" and add tests
 
 0.0.4  2024-05-25T19:49:54+02:00
     - Refined BufferIterator logic with dedicated "skip-at-least"

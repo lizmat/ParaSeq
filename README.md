@@ -264,7 +264,7 @@ keys
 kv
 --
 
-[`.kv`](https://docs.raku.org/type/List#routine_kv)
+**Status**: an optimized version of the [`.kv`](https://docs.raku.org/type/List#routine_kv) method has been implemented.
 
 map
 ---
