@@ -1,11 +1,14 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.0.6  2024-05-28T20:46:35+02:00
     - Added ".list" coercer
     - Updated status of ".keys" and added tests
     - Added optimized ".kv" and tests
     - Added optimized ".pairs" and tests
     - Added optimized ".antipairs" and tests
+    - Only optimize .unique(:with) where op is not ===
     - Updated status of ".pick" and added tests
     - Updated status of ".roll" and added tests
 
