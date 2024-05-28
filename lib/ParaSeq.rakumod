@@ -1102,8 +1102,10 @@ class ParaSeq does Sequence {
                 my uint $i;
                 nqp::while(
                   $i < $elems,
-                  nqp::push($output,$offset + $i),
-                  nqp::push($output,nqp::atpos($input,$i++))
+                  nqp::stmts(
+                    nqp::push($output,$offset + $i),
+                    nqp::push($output,nqp::atpos($input,$i++))
+                  )
                 );
 
                 self!batch-done($ordinal, $then, $input, $semaphore, $output);
