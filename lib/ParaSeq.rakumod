@@ -1216,8 +1216,7 @@ class ParaSeq does Sequence {
 
     multi method reverse(ParaSeq:D:) {
         self!pass-the-chain:
-          Rakudo::Iterator.ReifiedReverse:
-            self.IterationBuffer, Mu
+          Rakudo::Iterator.ReifiedReverse(self.IterationBuffer, Mu)
     }
 
     multi method rotate(ParaSeq:D: $rotate) {
@@ -1277,52 +1276,15 @@ class ParaSeq does Sequence {
     # one thread *still* would only be produced once, with the first value
     # seen (when using a specific :as modifier)
     proto method unique(|) {*}
-    multi method unique(ParaSeq:D: :with(&op) = &[===], :&as = &identity) {
+    multi method unique(ParaSeq:D: :with(&op)!, :&as = &identity) {
+        return self.unique(:&as) if nqp::eqaddr(&op,&[===]);
 
         my $SCHEDULER := $!SCHEDULER;
         my $hashes    := nqp::create(IB);  # list of hashes, keyed on threadid
         my $lock      := Lock.new;
 
-        # Logic for queuing a buffer for unique WITHOUT an infix op
-        sub processor-without(uint $ordinal, $input is raw, $semaphore) {
-
-            $SCHEDULER.cue: {
-                my uint $then = nqp::time;
-                my      $output := nqp::create(IB);
-
-                my int $i = nqp::threadid(nqp::currentthread);
-                my $seen := $lock.protect: {
-                    nqp::ifnull(
-                      nqp::atpos($hashes,$i),
-                      nqp::bindpos($hashes,$i,nqp::hash)
-                    )
-                }
-
-                my int $m = nqp::elems($input);
-                $i = 0;
-                nqp::until(
-                  $i == $m || nqp::atomicload_i($!stop),
-                  nqp::unless(
-                    nqp::existskey(
-                      $seen,
-                      (my str $key = as(
-                        my $value := nqp::atpos($input,$i++)
-                      ).WHICH)
-                    ),
-                    nqp::stmts(
-                      nqp::bindkey($seen,$key,1),
-                      nqp::push($output,$value),
-                      nqp::push($output,nqp::clone($key))
-                    )
-                  )
-                );
-
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
         # Logic for queuing a buffer for unique WITH an infix op
-        sub processor-with(uint $ordinal, $input is raw, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore) {
 
             $SCHEDULER.cue: {
                 my uint $then = nqp::time;
@@ -1373,9 +1335,7 @@ class ParaSeq does Sequence {
         }
 
         # Start the process and fill buffer with initial result
-        self!start(
-          nqp::eqaddr(&op,&[===]) ?? &processor-without !! &processor-with
-        ).iterator.push-all(my $result := nqp::create(IB));
+        my $result := self!start(&processor).IterationBuffer;
 
         # Get rid of the empty slots, caused by threadids of threads that did
         # *not* run any uniquing logic
@@ -1434,6 +1394,9 @@ class ParaSeq does Sequence {
               ?? UniqueIterator.new($seen, $result)  # need further checks
               !! WhichIterator.new($result)          # all ok
         }
+    }
+    multi method unique(ParaSeq:D: :&as = &identity) {
+        self!pass-the-chain: self.List.unique(:&as).iterator
     }
 
     multi method values(ParaSeq:D:) { self }
