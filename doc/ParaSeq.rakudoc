@@ -354,7 +354,10 @@ L<C<.permutations>|https://docs.raku.org/type/List#routine_permutations>
 
 =head2 pick
 
-L<C<.pick>|https://docs.raku.org/type/List#routine_pick>
+B<Status>: the nature of the
+L<C<.pick>|https://docs.raku.org/type/List#routine_pick> basically
+makes it impossible to hyper.  Therefore, B<no> specific hypering
+logic has been added for this method.
 
 =head2 produce
 

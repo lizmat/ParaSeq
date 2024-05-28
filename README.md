@@ -314,7 +314,7 @@ permutations
 pick
 ----
 
-[`.pick`](https://docs.raku.org/type/List#routine_pick)
+**Status**: the nature of the [`.pick`](https://docs.raku.org/type/List#routine_pick) basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 produce
 -------
