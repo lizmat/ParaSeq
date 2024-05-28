@@ -6,6 +6,8 @@ Revision history for ParaSeq
     - Added optimized ".kv" and tests
     - Added optimized ".pairs" and tests
     - Added optimized ".antipairs" and tests
+    - Updated status of ".pick" and added tests
+    - Updated status of ".roll" and added tests
 
 0.0.5  2024-05-27T17:23:14+02:00
     - Added a *lot* of methods, at least as stubs for now

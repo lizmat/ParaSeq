@@ -5,7 +5,7 @@ plan 6;
 
 my constant $elems = 200000;
 my constant $list  = (^$elems).List;
-my constant $all   = $list.pick(*).Set;
+my constant $all   = $list.Set;
 my constant $half  = $elems / 2;
 my constant $batch = 16;
 

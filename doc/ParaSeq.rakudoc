@@ -373,7 +373,10 @@ L<C<.reverse>|https://docs.raku.org/type/List#routine_reverse>
 
 =head2 roll
 
-L<C<.roll>|https://docs.raku.org/type/List#routine_roll>
+B<Status>: the nature of the
+L<C<.roll>|https://docs.raku.org/type/List#routine_roll> basically
+makes it impossible to hyper.  Therefore, B<no> specific hypering
+logic has been added for this method.
 
 =head2 rotate
 

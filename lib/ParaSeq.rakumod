@@ -1219,6 +1219,10 @@ class ParaSeq does Sequence {
           Rakudo::Iterator.ReifiedReverse(self.IterationBuffer, Mu)
     }
 
+    multi method roll(ParaSeq:D: $what) {
+        self!pass-the-chain: self.List.roll($what).iterator
+    }
+
     multi method rotate(ParaSeq:D: $rotate) {
         self!pass-the-chain: self.List.rotate($rotate).iterator
     }

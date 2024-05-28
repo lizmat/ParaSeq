@@ -334,7 +334,7 @@ reverse
 roll
 ----
 
-[`.roll`](https://docs.raku.org/type/List#routine_roll)
+**Status**: the nature of the [`.roll`](https://docs.raku.org/type/List#routine_roll) basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 rotate
 ------
