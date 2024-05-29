@@ -358,18 +358,24 @@ L<C<.repeated>|https://docs.raku.org/type/Any#method_repeated>
 
 =head2 reverse
 
-L<C<.reverse>|https://docs.raku.org/type/List#routine_reverse>
+B<Status>: the nature of the
+L<C<.reverse>|https://docs.raku.org/type/List#routine_reverse> method
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for this method.
 
 =head2 roll
 
 B<Status>: the nature of the
-L<C<.roll>|https://docs.raku.org/type/List#routine_roll> basically
-makes it impossible to hyper.  Therefore, B<no> specific hypering
-logic has been added for this method.
+L<C<.roll>|https://docs.raku.org/type/List#routine_roll> method 
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for this method.
 
 =head2 rotate
 
-L<C<.rotate>|https://docs.raku.org/type/List#routine_rotate>
+B<Status>: the nature of the
+L<C<.rotate>|https://docs.raku.org/type/List#routine_rotate> method
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for this method.
 
 =head2 rotor
 

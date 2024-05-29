@@ -1255,8 +1255,12 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.List.roll($what).iterator
     }
 
-    multi method rotate(ParaSeq:D: $rotate) {
-        self!pass-the-chain: self.List.rotate($rotate).iterator
+    multi method rotate(ParaSeq:D: Int(Cool) $rotate) {
+        $rotate
+          ?? self!pass-the-chain(
+               Rakudo::Iterator.ReifiedRotate($rotate, self.IterationBuffer, Mu)
+             )
+          !! self
     }
 
     proto method rotor(|) {*}

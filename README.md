@@ -316,17 +316,17 @@ repeated
 reverse
 -------
 
-[`.reverse`](https://docs.raku.org/type/List#routine_reverse)
+**Status**: the nature of the [`.reverse`](https://docs.raku.org/type/List#routine_reverse) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 roll
 ----
 
-**Status**: the nature of the [`.roll`](https://docs.raku.org/type/List#routine_roll) basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+**Status**: the nature of the [`.roll`](https://docs.raku.org/type/List#routine_roll) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 rotate
 ------
 
-[`.rotate`](https://docs.raku.org/type/List#routine_rotate)
+**Status**: the nature of the [`.rotate`](https://docs.raku.org/type/List#routine_rotate) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 rotor
 -----
