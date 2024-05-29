@@ -1,16 +1,17 @@
 use Test;
 use ParaSeq;
 
-plan 2;
+plan 4;
 
-my constant $elems = 200000;
-my constant $list  = (^$elems).pick(*).List;
-my constant $batch = 16;
+my constant $elems     = 200000;
+my constant $list      = (^$elems).pick(*).List;
 my constant $antipairs = $list.antipairs.List;
+my constant $batch     = 16;
 
 for 1, ParaSeq.default-degree {
-    is-deeply $list.&hyperize($batch, $_).antipairs.List, $antipairs,
-      ".antipairs with degree = $_";
+    my $seq := $list.&hyperize($batch, $_).antipairs;
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $antipairs, ".antipairs with degree = $_";
 }
 
 # vim: expandtab shiftwidth=4

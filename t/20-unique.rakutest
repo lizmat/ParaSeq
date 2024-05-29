@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 12;
+plan 24;
 
 my constant $elems    = 10000;
 my constant $list     = (^$elems).pick(*).List;
@@ -14,14 +14,19 @@ my constant $one      = $same.unique.List;
 
 for 1, ParaSeq.default-degree {
     for &[===], &[==] -> $with {
-        is-deeply $list.&hyperize($batch, $_).unique(:$with).List,
-          $unique,
+        my $seq := $list.&hyperize($batch, $_).unique(:$with);
+        isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+        is-deeply $seq.List, $unique,
           "list.unique with degree = $_ with $with.name()";
-        is-deeply $list.&hyperize($batch, $_).unique(:$with, :$as).List,
-          $hundreds,
+
+        $seq := $list.&hyperize($batch, $_).unique(:$with, :$as);
+        isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+        is-deeply $seq.List, $hundreds,
           "list.unique(:as(* div 100)) with degree = $_ with $with.name()";
-        is-deeply $same.&hyperize($batch, $_).unique(:$with).List,
-          $one,
+
+        $seq := $same.&hyperize($batch, $_).unique(:$with);
+        isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+        is-deeply $seq.List, $one,
           "same.unique with degree = $_ with $with.name()";
     }
 }

@@ -3,14 +3,17 @@ use ParaSeq;
 
 plan 4;
 
-my constant $elems  = 200000;
-my constant @list   = (^$elems).map(*.Rat);
-my constant $joined = @list.join("-");
+my constant $elems   = 200000;
+my constant @list    = (^$elems).map(*.Rat).List;
+my constant $with    = @list.join("-");
+my constant $without = @list.join;
 
 for 1, ParaSeq.default-degree {
-    my $seq := @list.&hyperize(Any, $_);
-    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
-    is $seq.join("-"), $joined, "join with degree = $_";
+    is @list.&hyperize(Any, $_).join("-"), $with,
+      "join('-') with degree = $_";
+
+    is @list.&hyperize(Any, $_).join, $without,
+      "join() with degree = $_";
 }
 
 # vim: expandtab shiftwidth=4

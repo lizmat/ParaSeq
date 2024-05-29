@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 2;
+plan 4;
 
 my constant $elems = 200000;
 my constant $list  = (^$elems).pick(*).List;
@@ -9,8 +9,9 @@ my constant $batch = 16;
 my constant $kv    = $list.kv.List;
 
 for 1, ParaSeq.default-degree {
-    is-deeply $list.&hyperize($batch, $_).kv.List, $kv,
-      ".kv with degree = $_";
+    my $seq := $list.&hyperize($batch, $_).kv;
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $kv, ".kv with degree = $_";
 }
 
 # vim: expandtab shiftwidth=4
