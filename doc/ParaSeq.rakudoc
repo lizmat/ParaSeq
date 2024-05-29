@@ -498,12 +498,15 @@ and returns that.
 =head2 list
 
 B<Status>: the L<C<list>|https://docs.raku.org/routine/list> coercer
-is implemented: it removes all hypering information from its invocant.
+is implemented: it creates a C<List> object with the object's
+iterator as its "todo" (so no elements are reified until they are
+actually demanded).  And thus removes all hypering information.
 
 =head2 List
 
 B<Status>: the L<C<List>|https://docs.raku.org/type/List> coercer
-is implemented: it removes all hypering information from its invocant.
+is implemented: it creates a fully reified C<List> and thus removes
+all hypering information.
 
 =head2 Map
 

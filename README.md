@@ -431,12 +431,12 @@ IterationBuffer
 list
 ----
 
-**Status**: the [`list`](https://docs.raku.org/routine/list) coercer is implemented: it removes all hypering information from its invocant.
+**Status**: the [`list`](https://docs.raku.org/routine/list) coercer is implemented: it creates a `List` object with the object's iterator as its "todo" (so no elements are reified until they are actually demanded). And thus removes all hypering information.
 
 List
 ----
 
-**Status**: the [`List`](https://docs.raku.org/type/List) coercer is implemented: it removes all hypering information from its invocant.
+**Status**: the [`List`](https://docs.raku.org/type/List) coercer is implemented: it creates a fully reified `List` and thus removes all hypering information.
 
 Map
 ---
