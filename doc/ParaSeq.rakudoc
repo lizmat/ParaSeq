@@ -386,7 +386,11 @@ L<C<.rotate>|https://docs.raku.org/type/List#routine_rotate>
 
 =head2 rotor
 
-L<C<.rotor>|https://docs.raku.org/type/List#routine_rotor>
+B<Status>: an optimized version of the
+L<C<.rotor>|https://docs.raku.org/type/List#routine_rotor> method
+has been implemented for the single argument non-C<Pair> case.  All
+other cases are basically too complicated to hyper, and therefore
+have no specific hypering logic.
 
 =head2 slice
 

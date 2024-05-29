@@ -344,7 +344,7 @@ rotate
 rotor
 -----
 
-[`.rotor`](https://docs.raku.org/type/List#routine_rotor)
+**Status**: an optimized version of the [`.rotor`](https://docs.raku.org/type/List#routine_rotor) method has been implemented for the single argument non-`Pair` case. All other cases are basically too complicated to hyper, and therefore have no specific hypering logic.
 
 slice
 -----

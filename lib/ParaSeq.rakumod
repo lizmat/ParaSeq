@@ -1078,6 +1078,7 @@ class ParaSeq does Sequence {
         self!start(&processor, $size)
     }
 
+    proto method batch(|) {*}
     multi method batch(ParaSeq:D: Int:D :$elems!) { self!batch($elems,1) }
     multi method batch(ParaSeq:D: Int:D  $elems ) { self!batch($elems,1) }
 
@@ -1263,8 +1264,11 @@ class ParaSeq does Sequence {
     }
 
     proto method rotor(|) {*}
+    multi method rotor(ParaSeq:D: Int:D $size, :$partial) {
+        self!batch($size, $partial.Bool)                   # can be faster
+    }
     multi method rotor(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.rotor(|c).iterator
+        self!pass-the-chain: self.List.rotor(|c).iterator  # nah, too difficult
     }
 
     multi method serial(ParaSeq:D:) { self.Seq }
