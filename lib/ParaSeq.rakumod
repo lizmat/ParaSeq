@@ -1062,9 +1062,9 @@ class ParaSeq does Sequence {
                     ($end   = nqp::add_i($end,  $size)),
                     nqp::if(
                       $end >= $elems,
-                      nqp::if(
+                      nqp::if(                          # incomplete final batch
                         $partial,
-                        ($end = nqp::sub_i($elems,1)),  # take next partial
+                        ($end = nqp::sub_i($elems,1)),  # take final partially
                         ($start = $elems)               # stop iterating
                       )
                     )
@@ -1097,10 +1097,6 @@ class ParaSeq does Sequence {
 
     multi method duckmap(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.duckmap(|c).iterator
-    }
-
-    multi method eager(ParaSeq:D:) {
-        self!pass-the-chain: self.List.iterator
     }
 
     multi method flat(ParaSeq:D:) {
@@ -1270,8 +1266,6 @@ class ParaSeq does Sequence {
     multi method rotor(ParaSeq:D: |c) {
         self!pass-the-chain: self.List.rotor(|c).iterator  # nah, too difficult
     }
-
-    multi method serial(ParaSeq:D:) { self.Seq }
 
     proto method skip(|) {*}
     multi method skip(ParaSeq:D: |c) {
@@ -1458,8 +1452,9 @@ class ParaSeq does Sequence {
         $Bool
     }
 
-    multi method Hash(ParaSeq:D:) { self.List.Hash }
-    multi method Int( ParaSeq:D:) { self.elems     }
+    multi method eager(ParaSeq:D:) { self.List      }
+    multi method Hash(ParaSeq:D: ) { self.List.Hash }
+    multi method Int( ParaSeq:D: ) { self.elems     }
 
     multi method IterationBuffer(ParaSeq:D:) {
         self.iterator.push-all(my $buffer := nqp::create(IB));
@@ -1476,6 +1471,7 @@ class ParaSeq does Sequence {
     method Numeric(ParaSeq:D:) { self.elems }
 
     multi method Seq(    ParaSeq:D:) { Seq.new: self.iterator    }
+    multi method serial( ParaSeq:D:) { self.Seq                  }
     multi method Set(    ParaSeq:D:) { self.List.Set             }
     multi method SetHash(ParaSeq:D:) { self.List.SetHash         }
     multi method Slip(   ParaSeq:D:) { self.IterationBuffer.Slip }

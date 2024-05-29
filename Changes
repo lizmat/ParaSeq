@@ -3,6 +3,8 @@ Revision history for ParaSeq
 {{$NEXT}}
     - Added optimized ".batch" and tests
     - Added partially optimized ".rotor" and tests
+    - Updated status of ".eager" and added tests
+    - Updated status of ".serial" and added tests
 
 0.0.6  2024-05-28T20:46:35+02:00
     - Added ".list" coercer

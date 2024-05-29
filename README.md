@@ -122,14 +122,14 @@ The [`.classify`](https://docs.raku.org/type/List#routine_classify) method retur
 elems
 -----
 
-The [`.elems`](https://docs.raku.org/type/List#routine_elems) method returns The number of elements that the iteration produced. Is typically less than the number of elements in the source, but can also be more in the case of a `Callable` in a `.map`.
+The [`.elems`](https://docs.raku.org/type/List#routine_elems) method returns the number of elements that the iteration produced. Is typically less than the number of elements in the source, but can also be more in the case of a `Callable` in a `.map`.
 
 **Status**: an optimized version of the `.elems` method has been implemented.
 
 end
 ---
 
-The [`.end`](https://docs.raku.org/type/List#routine_end) method return The number of `.elems` minus one.
+The [`.end`](https://docs.raku.org/type/List#routine_end) method return the number of `.elems` minus one.
 
 **Status**: an optimized version of the `.end` method has been implemented.
 
@@ -220,11 +220,6 @@ duckmap
 -------
 
 [`.duckmap`](https://docs.raku.org/type/Any#method_duckmap)
-
-eager
------
-
-[`.eager`](https://docs.raku.org/type/List#routine_eager)
 
 first
 -----
@@ -421,6 +416,11 @@ Bool
 
 **Status**: an optimized version of the [`Bool`](https://docs.raku.org/type/Bool) coercer has been implemented.
 
+eager
+-----
+
+**Status**: the [`.eager`](https://docs.raku.org/type/List#routine_eager) method is functionally the same as the `.List`, and as such is implemented.
+
 Hash
 ----
 
@@ -470,6 +470,11 @@ Seq
 ---
 
 **Status**: the [`Seq`](https://docs.raku.org/type/Seq) coercer is implemented: it removes all hypering information from its invocant.
+
+serial
+------
+
+**Status**: the [`.serial`](https://docs.raku.org/type/HyperSeq#method_serial) method is functionally the same as the `.Seq`, and as such is implemented.
 
 Set
 ---

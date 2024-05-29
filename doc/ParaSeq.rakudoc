@@ -163,7 +163,7 @@ specific hypering logic has been added for this method at this point.
 =head2 elems
 
 The L<C<.elems>|https://docs.raku.org/type/List#routine_elems> method
-returns The number of elements that the iteration produced.  Is typically
+returns the number of elements that the iteration produced.  Is typically
 less than the number of elements in the source, but can also be more in
 the case of a C<Callable> in a C<.map>.
 
@@ -173,7 +173,7 @@ implemented.
 =head2 end
 
 The L<C<.end>|https://docs.raku.org/type/List#routine_end> method
-return The number of C<.elems> minus one.
+return the number of C<.elems> minus one.
 
 B<Status>: an optimized version of the C<.end> method has been
 implemented.
@@ -274,10 +274,6 @@ L<C<.deepmap>|https://docs.raku.org/type/Any#method_deepmap>
 =head2 duckmap
 
 L<C<.duckmap>|https://docs.raku.org/type/Any#method_duckmap>
-
-=head2 eager
-
-L<C<.eager>|https://docs.raku.org/type/List#routine_eager>
 
 =head2 first
 
@@ -474,6 +470,12 @@ B<Status>: an optimized version of the
 L<C<Bool>|https://docs.raku.org/type/Bool> coercer has been
 implemented.
 
+=head2 eager
+
+B<Status>: the L<C<.eager>|https://docs.raku.org/type/List#routine_eager>
+method is functionally the same as the C<.List>, and as such is
+implemented.
+
 =head2 Hash
 
 B<Status>: putting together the
@@ -538,6 +540,12 @@ implemented.
 
 B<Status>: the L<C<Seq>|https://docs.raku.org/type/Seq> coercer
 is implemented: it removes all hypering information from its invocant.
+
+=head2 serial
+
+B<Status>: the
+L<C<.serial>|https://docs.raku.org/type/HyperSeq#method_serial> method
+is functionally the same as the C<.Seq>, and as such is implemented.
 
 =head2 Set
 
