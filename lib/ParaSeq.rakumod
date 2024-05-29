@@ -790,6 +790,83 @@ class ParaSeq does Sequence {
     proto method tail(|) {*}
     multi method tail(ParaSeq:D:) { self.List.tail }
 
+#-- antipairs ------------------------------------------------------------------
+
+    multi method antipairs(ParaSeq:D:) {
+        my $SCHEDULER := $!SCHEDULER;
+        my uint $base;  # base offset
+
+        # Logic for queuing a buffer for .antipairs
+        sub processor(uint $ordinal, $input is raw, $semaphore) {
+            my uint $offset = $base;
+            my uint $elems  = nqp::elems($input);
+            $base = $base + $elems;
+
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                # Store the Pairs as fast as possible, no stop check needed
+                my uint $i;
+                nqp::while(
+                  $i < $elems,
+                  nqp::push(
+                    $output,
+                    Pair.new(nqp::atpos($input,$i),$offset + $i++)
+                  )
+                );
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Let's go!
+        self!start(&processor)
+    }
+
+#- batch -----------------------------------------------------------------------
+
+    method !batch(uint $size, uint $partial) {
+
+        # Logic for queuing a buffer for batches
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input is raw, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                # Ultra-fast batching, don't care about checking stopper
+                my uint $elems = nqp::elems($input);
+                my uint $start;
+                my uint $end = nqp::sub_i($size,1);
+                nqp::while(
+                  $start < $elems,
+                  nqp::stmts(
+                    nqp::push($output,nqp::slice($input,$start,$end).List),
+                    ($start = nqp::add_i($start,$size)),
+                    ($end   = nqp::add_i($end,  $size)),
+                    nqp::if(
+                      $end >= $elems,
+                      nqp::if(                          # incomplete final batch
+                        $partial,
+                        ($end = nqp::sub_i($elems,1)),  # take final partially
+                        ($start = $elems)               # stop iterating
+                      )
+                    )
+                  )
+                );
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Let's go!
+        self!start(&processor, $size)
+    }
+
+    proto method batch(|) {*}
+    multi method batch(ParaSeq:D: Int:D :$elems!) { self!batch($elems,1) }
+    multi method batch(ParaSeq:D: Int:D  $elems ) { self!batch($elems,1) }
+
 #- first -----------------------------------------------------------------------
 
     multi method first(ParaSeq:D: Callable:D $matcher) {
@@ -982,143 +1059,7 @@ class ParaSeq does Sequence {
         self!start($k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v)
     }
 
-#- map -------------------------------------------------------------------------
-
-    multi method map(ParaSeq:D: Callable:D $mapper) {
-
-        # Logic for queuing a buffer for map
-        my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
-            $SCHEDULER.cue: {
-                my uint $then    = nqp::time;
-                my      $output := nqp::create(IB);
-
-                my $iterator := $input.Seq.map($mapper).iterator;
-                nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
-                  nqp::push($output,$pulled)
-                );
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
-        # Let's go!
-        self!start(&processor, granularity($mapper))
-    }
-
-#- other standard Iterable interfaces ------------------------------------------
-
-    multi method antipairs(ParaSeq:D:) {
-        my $SCHEDULER := $!SCHEDULER;
-        my uint $base;  # base offset
-
-        # Logic for queuing a buffer for .antipairs
-        sub processor(uint $ordinal, $input is raw, $semaphore) {
-            my uint $offset = $base;
-            my uint $elems  = nqp::elems($input);
-            $base = $base + $elems;
-
-            $SCHEDULER.cue: {
-                my uint $then    = nqp::time;
-                my      $output := nqp::create(IB);
-
-                # Store the Pairs as fast as possible, no stop check needed
-                my uint $i;
-                nqp::while(
-                  $i < $elems,
-                  nqp::push(
-                    $output,
-                    Pair.new(nqp::atpos($input,$i),$offset + $i++)
-                  )
-                );
-
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
-        # Let's go!
-        self!start(&processor)
-    }
-
-    method !batch(uint $size, uint $partial) {
-
-        # Logic for queuing a buffer for batches
-        my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input is raw, $semaphore) {
-            $SCHEDULER.cue: {
-                my uint $then    = nqp::time;
-                my      $output := nqp::create(IB);
-
-                # Ultra-fast batching, don't care about checking stopper
-                my uint $elems = nqp::elems($input);
-                my uint $start;
-                my uint $end = nqp::sub_i($size,1);
-                nqp::while(
-                  $start < $elems,
-                  nqp::stmts(
-                    nqp::push($output,nqp::slice($input,$start,$end).List),
-                    ($start = nqp::add_i($start,$size)),
-                    ($end   = nqp::add_i($end,  $size)),
-                    nqp::if(
-                      $end >= $elems,
-                      nqp::if(                          # incomplete final batch
-                        $partial,
-                        ($end = nqp::sub_i($elems,1)),  # take final partially
-                        ($start = $elems)               # stop iterating
-                      )
-                    )
-                  )
-                );
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
-        # Let's go!
-        self!start(&processor, $size)
-    }
-
-    proto method batch(|) {*}
-    multi method batch(ParaSeq:D: Int:D :$elems!) { self!batch($elems,1) }
-    multi method batch(ParaSeq:D: Int:D  $elems ) { self!batch($elems,1) }
-
-    proto method collate(|) {*}
-    multi method collate(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.collate(|c).iterator
-    }
-
-    multi method combinations(ParaSeq:D: $of) {
-        self!pass-the-chain: self.List.combinations($of).iterator
-    }
-
-    multi method deepmap(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.deepmap(|c).iterator
-    }
-
-    multi method duckmap(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.duckmap(|c).iterator
-    }
-
-    multi method flat(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.flat.iterator
-    }
-
-    proto method flatmap(|) {*}
-    multi method flatmap(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.flatmap(|c).iterator
-    }
-
-    multi method head(ParaSeq:D: $what) {
-        self!pass-the-chain: self.Seq.head($what).iterator
-    }
-
-    multi method invert(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.invert.iterator
-    }
-
-    multi method keys(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.keys.iterator
-    }
+#- kv --------------------------------------------------------------------------
 
     multi method kv(ParaSeq:D:) {
         my $SCHEDULER := $!SCHEDULER;
@@ -1152,49 +1093,32 @@ class ParaSeq does Sequence {
         self!start(&processor)
     }
 
-    multi method max(ParaSeq:D: &by = &[cmp], :$k!) {
-        $k
-          ?? self!pass-the-chain(self.Seq.max(&by, :k))
-          !! self.max(&by, |%_)
-    }
-    multi method max(ParaSeq:D: &by = &[cmp], :$kv!) {
-        $kv
-          ?? self!pass-the-chain(self.Seq.max(&by, :kv))
-          !! self.max(&by, |%_)
-    }
-    multi method max(ParaSeq:D: &by = &[cmp], :$p!) {
-        $p
-          ?? self!pass-the-chain(self.Seq.max(&by, :p))
-          !! self.max(&by, |%_)
+#- map -------------------------------------------------------------------------
+
+    multi method map(ParaSeq:D: Callable:D $mapper) {
+
+        # Logic for queuing a buffer for map
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                my $iterator := $input.Seq.map($mapper).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
+                    || nqp::atomicload_i($!stop),
+                  nqp::push($output,$pulled)
+                );
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Let's go!
+        self!start(&processor, granularity($mapper))
     }
 
-    multi method min(ParaSeq:D: &by = &[cmp], :$k!) {
-        $k
-          ?? self!pass-the-chain(self.Seq.min(&by, :k))
-          !! self.min(&by, |%_)
-    }
-    multi method min(ParaSeq:D: &by = &[cmp], :$kv!) {
-        $kv
-          ?? self!pass-the-chain(self.Seq.min(&by, :kv))
-          !! self.min(&by, |%_)
-    }
-    multi method min(ParaSeq:D: &by = &[cmp], :$p!) {
-        $p
-          ?? self!pass-the-chain(self.Seq.min(&by, :p))
-          !! self.min(&by, |%_)
-    }
-
-    multi method maxpairs(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.maxpairs.iterator
-    }
-
-    multi method minpairs(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.minpairs.iterator
-    }
-
-    multi method nodemap(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.nodemap(|c).iterator
-    }
+#- pairs -----------------------------------------------------------------------
 
     multi method pairs(ParaSeq:D:) {
         my $SCHEDULER := $!SCHEDULER;
@@ -1228,98 +1152,14 @@ class ParaSeq does Sequence {
         self!start(&processor)
     }
 
-    multi method pairup(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.pairup.iterator
-    }
+#- unique ----------------------------------------------------------------------
+# The unique method uses a 2 stage approach: the first stage is having all
+# the threads produce "their" unique values, with a "seen" hash for each
+# thread that was being used.  The second stage then post-processes the
+# entire result, making sure that a value that was seen by more than one
+# thread *still* would only be produced once, with the first value seen
+# (when using a specific :as modifier)
 
-    proto method permutations(|) {*}
-    multi method permutations(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.permutations(|c).iterator
-    }
-
-    multi method pick(ParaSeq:D: $what) {
-        self!pass-the-chain: self.List.pick($what).iterator
-    }
-
-    multi method produce(ParaSeq:D: Callable:D $producer) {
-        self!pass-the-chain: self.Seq.produce($producer).iterator
-    }
-
-    proto method repeated(|) {*}
-    multi method repeated(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.repeated(|c).iterator
-    }
-
-    multi method reverse(ParaSeq:D:) {
-        self!pass-the-chain:
-          Rakudo::Iterator.ReifiedReverse(self.IterationBuffer, Mu)
-    }
-
-    multi method roll(ParaSeq:D: $what) {
-        self!pass-the-chain: self.List.roll($what).iterator
-    }
-
-    multi method rotate(ParaSeq:D: Int(Cool) $rotate) {
-        $rotate
-          ?? self!pass-the-chain(
-               Rakudo::Iterator.ReifiedRotate($rotate, self.IterationBuffer, Mu)
-             )
-          !! self
-    }
-
-    proto method rotor(|) {*}
-    multi method rotor(ParaSeq:D: Int:D $size, :$partial) {
-        self!batch($size, $partial.Bool)                   # can be faster
-    }
-    multi method rotor(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.rotor(|c).iterator  # nah, too difficult
-    }
-
-    proto method skip(|) {*}
-    multi method skip(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.skip(|c).iterator
-    }
-
-    proto method slice(|) {*}
-    multi method slice(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.slice(|c).iterator
-    }
-
-    proto method snip(|) {*}
-    multi method snip(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.snip(|c).iterator
-    }
-
-    proto method snitch(|) {*}
-    multi method snitch(ParaSeq:D: &snitcher = &note) {
-        self!pass-the-chain: self.Seq.snitch(&snitch).iterator
-    }
-
-    proto method sort(|) {*}
-    multi method sort(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.sort(|c).iterator
-    }
-
-    proto method squish(|) {*}
-    multi method squish(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.squish(|c).iterator
-    }
-
-    multi method tail(ParaSeq:D: $what) {
-        self!pass-the-chain: self.List.tail($what).iterator
-    }
-
-    proto method toggle(|) {*}
-    multi method toggle(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.toggle(|c).iterator
-    }
-
-    # The unique method uses a 2 stage approach: the first stage is having
-    # all the threads produce "their" unique values, with a "seen" hash for
-    # each thread that was being used.  The second stage then post-processes
-    # the entire result, making sure that a value that was seen by more than
-    # one thread *still* would only be produced once, with the first value
-    # seen (when using a specific :as modifier)
     proto method unique(|) {*}
     multi method unique(ParaSeq:D: :with(&op)!, :&as = &identity) {
         return self.unique(:&as) if nqp::eqaddr(&op,&[===]);
@@ -1442,6 +1282,176 @@ class ParaSeq does Sequence {
     }
     multi method unique(ParaSeq:D: :&as = &identity) {
         self!pass-the-chain: self.List.unique(:&as).iterator
+    }
+
+#- interfaces that are just infectious -----------------------------------------
+
+    proto method collate(|) {*}
+    multi method collate(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.collate(|c).iterator
+    }
+
+    multi method combinations(ParaSeq:D: $of) {
+        self!pass-the-chain: self.List.combinations($of).iterator
+    }
+
+    multi method deepmap(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.deepmap(|c).iterator
+    }
+
+    multi method duckmap(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.duckmap(|c).iterator
+    }
+
+    multi method flat(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.flat.iterator
+    }
+
+    proto method flatmap(|) {*}
+    multi method flatmap(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.flatmap(|c).iterator
+    }
+
+    multi method head(ParaSeq:D: $what) {
+        self!pass-the-chain: self.Seq.head($what).iterator
+    }
+
+    multi method invert(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.invert.iterator
+    }
+
+    multi method keys(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.keys.iterator
+    }
+
+    multi method max(ParaSeq:D: &by = &[cmp], :$k!) {
+        $k
+          ?? self!pass-the-chain(self.Seq.max(&by, :k))
+          !! self.max(&by, |%_)
+    }
+    multi method max(ParaSeq:D: &by = &[cmp], :$kv!) {
+        $kv
+          ?? self!pass-the-chain(self.Seq.max(&by, :kv))
+          !! self.max(&by, |%_)
+    }
+    multi method max(ParaSeq:D: &by = &[cmp], :$p!) {
+        $p
+          ?? self!pass-the-chain(self.Seq.max(&by, :p))
+          !! self.max(&by, |%_)
+    }
+
+    multi method min(ParaSeq:D: &by = &[cmp], :$k!) {
+        $k
+          ?? self!pass-the-chain(self.Seq.min(&by, :k))
+          !! self.min(&by, |%_)
+    }
+    multi method min(ParaSeq:D: &by = &[cmp], :$kv!) {
+        $kv
+          ?? self!pass-the-chain(self.Seq.min(&by, :kv))
+          !! self.min(&by, |%_)
+    }
+    multi method min(ParaSeq:D: &by = &[cmp], :$p!) {
+        $p
+          ?? self!pass-the-chain(self.Seq.min(&by, :p))
+          !! self.min(&by, |%_)
+    }
+
+    multi method maxpairs(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.maxpairs.iterator
+    }
+
+    multi method minpairs(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.minpairs.iterator
+    }
+
+    multi method nodemap(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.nodemap(|c).iterator
+    }
+
+    multi method pairup(ParaSeq:D:) {
+        self!pass-the-chain: self.Seq.pairup.iterator
+    }
+
+    proto method permutations(|) {*}
+    multi method permutations(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.permutations(|c).iterator
+    }
+
+    multi method pick(ParaSeq:D: $what) {
+        self!pass-the-chain: self.List.pick($what).iterator
+    }
+
+    multi method produce(ParaSeq:D: Callable:D $producer) {
+        self!pass-the-chain: self.Seq.produce($producer).iterator
+    }
+
+    proto method repeated(|) {*}
+    multi method repeated(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.repeated(|c).iterator
+    }
+
+    multi method reverse(ParaSeq:D:) {
+        self!pass-the-chain:
+          Rakudo::Iterator.ReifiedReverse(self.IterationBuffer, Mu)
+    }
+
+    multi method roll(ParaSeq:D: $what) {
+        self!pass-the-chain: self.List.roll($what).iterator
+    }
+
+    multi method rotate(ParaSeq:D: Int(Cool) $rotate) {
+        $rotate
+          ?? self!pass-the-chain(
+               Rakudo::Iterator.ReifiedRotate($rotate, self.IterationBuffer, Mu)
+             )
+          !! self
+    }
+
+    proto method rotor(|) {*}
+    multi method rotor(ParaSeq:D: Int:D $size, :$partial) {
+        self!batch($size, $partial.Bool)                   # can be faster
+    }
+    multi method rotor(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.rotor(|c).iterator  # nah, too difficult
+    }
+
+    proto method skip(|) {*}
+    multi method skip(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.skip(|c).iterator
+    }
+
+    proto method slice(|) {*}
+    multi method slice(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.slice(|c).iterator
+    }
+
+    proto method snip(|) {*}
+    multi method snip(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.snip(|c).iterator
+    }
+
+    proto method snitch(|) {*}
+    multi method snitch(ParaSeq:D: &snitcher = &note) {
+        self!pass-the-chain: self.Seq.snitch(&snitch).iterator
+    }
+
+    proto method sort(|) {*}
+    multi method sort(ParaSeq:D: |c) {
+        self!pass-the-chain: self.List.sort(|c).iterator
+    }
+
+    proto method squish(|) {*}
+    multi method squish(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.squish(|c).iterator
+    }
+
+    multi method tail(ParaSeq:D: $what) {
+        self!pass-the-chain: self.List.tail($what).iterator
+    }
+
+    proto method toggle(|) {*}
+    multi method toggle(ParaSeq:D: |c) {
+        self!pass-the-chain: self.Seq.toggle(|c).iterator
     }
 
     multi method values(ParaSeq:D:) { self }
