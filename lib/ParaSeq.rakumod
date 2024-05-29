@@ -1041,9 +1041,7 @@ class ParaSeq does Sequence {
         self!start(&processor)
     }
 
-    multi method batch(ParaSeq:D: :$elems!) { self.batch($elems) }
-    multi method batch(ParaSeq:D: Int:D $Size) {
-        my uint $size = $Size;
+    method !batch(uint $size, uint $partial) {
 
         # Logic for queuing a buffer for batches
         my $SCHEDULER := $!SCHEDULER;
@@ -1064,7 +1062,11 @@ class ParaSeq does Sequence {
                     ($end   = nqp::add_i($end,  $size)),
                     nqp::if(
                       $end >= $elems,
-                      $end = nqp::sub_i($elems,1)
+                      nqp::if(
+                        $partial,
+                        ($end = nqp::sub_i($elems,1)),  # take next partial
+                        ($start = $elems)               # stop iterating
+                      )
                     )
                   )
                 );
@@ -1075,6 +1077,9 @@ class ParaSeq does Sequence {
         # Let's go!
         self!start(&processor, $size)
     }
+
+    multi method batch(ParaSeq:D: Int:D :$elems!) { self!batch($elems,1) }
+    multi method batch(ParaSeq:D: Int:D  $elems ) { self!batch($elems,1) }
 
     proto method collate(|) {*}
     multi method collate(ParaSeq:D: |c) {
