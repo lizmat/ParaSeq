@@ -101,30 +101,24 @@ These methods return a single value that could be considered a reduction of the 
 are
 ---
 
-The [`.are`](https://docs.raku.org/type/Any#method_are) method returns either the most restrictive type, or a `Bool` if a test for a specific type was requested.
-
-**Status**: since this method is already **highly** optimized, adding specific hypering would only slow down execution.
+**Status**: since the [`.are`](https://docs.raku.org/type/Any#method_are) is already **highly** optimized, adding specific hypering would only slow down execution.
 
 categorize
 ----------
 
-The [`.categorize`](https://docs.raku.org/type/List#routine_categorize) method returns a `Hash` with the expected categorization.
-
-**Status**: since the `.categorize` method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
+**Status**: since the [`.categorize`](https://docs.raku.org/type/List#routine_categorize) method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
 
 classify
 --------
 
-The [`.classify`](https://docs.raku.org/type/List#routine_classify) method returns a `Hash` with the expected classification.
+method returns a `Hash` with the expected classification.
 
-**Status**: since the `.classify` method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
+**Status**: since the [`.classify`](https://docs.raku.org/type/List#routine_classify) method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
 
 elems
 -----
 
-The [`.elems`](https://docs.raku.org/type/List#routine_elems) method returns the number of elements that the iteration produced. Is typically less than the number of elements in the source, but can also be more in the case of a `Callable` in a `.map`.
-
-**Status**: an optimized version of the `.elems` method has been implemented.
+**Status**: an optimized version of the [`.elems`](https://docs.raku.org/type/List#routine_elems) method has been implemented.
 
 end
 ---
