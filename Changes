@@ -1,6 +1,7 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+    - Added optimized ".batch" and tests
 
 0.0.6  2024-05-28T20:46:35+02:00
     - Added ".list" coercer

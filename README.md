@@ -199,7 +199,7 @@ antipairs
 batch
 -----
 
-[`.batch`](https://docs.raku.org/type/List#method_batch)
+**Status**: an optimized version of the [`.batch`](https://docs.raku.org/type/List#method_batch) method has been implemented.
 
 collate
 -------

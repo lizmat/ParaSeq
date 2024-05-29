@@ -1041,9 +1041,39 @@ class ParaSeq does Sequence {
         self!start(&processor)
     }
 
-    proto method batch(|) {*}
-    multi method batch(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.batch(|c).iterator
+    multi method batch(ParaSeq:D: :$elems!) { self.batch($elems) }
+    multi method batch(ParaSeq:D: Int:D $Size) {
+        my uint $size = $Size;
+
+        # Logic for queuing a buffer for batches
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input is raw, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                # Ultra-fast batching, don't care about checking stopper
+                my uint $elems = nqp::elems($input);
+                my uint $start;
+                my uint $end = nqp::sub_i($size,1);
+                nqp::while(
+                  $start < $elems,
+                  nqp::stmts(
+                    nqp::push($output,nqp::slice($input,$start,$end).List),
+                    ($start = nqp::add_i($start,$size)),
+                    ($end   = nqp::add_i($end,  $size)),
+                    nqp::if(
+                      $end >= $elems,
+                      $end = nqp::sub_i($elems,1)
+                    )
+                  )
+                );
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Let's go!
+        self!start(&processor, $size)
     }
 
     proto method collate(|) {*}

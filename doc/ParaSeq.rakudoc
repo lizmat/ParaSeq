@@ -255,7 +255,9 @@ method has been implemented.
 
 =head2 batch
 
-L<C<.batch>|https://docs.raku.org/type/List#method_batch>
+B<Status>: an optimized version of the
+L<C<.batch>|https://docs.raku.org/type/List#method_batch> method
+has been implemented.
 
 =head2 collate
 
