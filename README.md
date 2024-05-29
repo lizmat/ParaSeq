@@ -129,30 +129,22 @@ The [`.elems`](https://docs.raku.org/type/List#routine_elems) method returns the
 end
 ---
 
-The [`.end`](https://docs.raku.org/type/List#routine_end) method return the number of `.elems` minus one.
-
-**Status**: an optimized version of the `.end` method has been implemented.
+**Status**: an optimized version of the [`.end`](https://docs.raku.org/type/List#routine_end) method has been implemented.
 
 first
 -----
 
-Only if the [`.first`](https://docs.raku.org/type/List#routine_first) is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
-
-**Status**: an optimized version of the `.first` method without any arguments, has been implemented.
+**Status**: an optimized version of the [`.first`](https://docs.raku.org/type/List#routine_first) method without any arguments (as an endpoint), has been implemented.
 
 head
 ----
 
-Only if the [`.head`](https://docs.raku.org/type/List#method_head) is called **without** any arguments, is it an endpoint and as such will return the **first** delivered value.
-
-**Status**: an optimized version of the `.head` method without any arguments, has been implemented.
+**Status**: an optimized version of the [`.head`](https://docs.raku.org/type/List#method_head) method without any arguments (as an endpoint), has been implemented.
 
 join
 ----
 
-The [`.join`](https://docs.raku.org/type/List#routine_join) method joins all delivered values together with the optional separator string (which defaults to `""`).
-
-**Status**: an optimized version of the `.join` method has been implemented.
+**Status**: an optimized version of the [`.join`](https://docs.raku.org/type/List#routine_join) method has been implemented.
 
 max
 ---
@@ -172,17 +164,17 @@ The [`.minmax`](https://docs.raku.org/type/Any#routine_minmax) method, when call
 reduce
 ------
 
-The [`.reduce`](https://docs.raku.org/type/List#routine_reduce) method is supported, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
+**Status**: an optimized version of the [`.reduce`](https://docs.raku.org/type/List#routine_reduce) method has been implemented, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
 
 sum
 ---
 
-The [`.sum`](https://docs.raku.org/type/List#routine_sum) method sums all delivered values. It is an optimized version of `.reduce(* + *)`.
+**Status**: an optimized version of the [`.sum`](https://docs.raku.org/type/List#routine_sum) method has been implemented.
 
 tail
 ----
 
-Only if the [`.tail`](https://docs.raku.org/type/List#method_tail) is called **without** any arguments, is it an endpoint and as such will return the **last** delivered value.
+**Status**: an optimized version of the [`.tail`](https://docs.raku.org/type/List#method_tail) method without any arguments (as an endpoint), has been implemented.
 
 INTERFACE METHODS
 =================
