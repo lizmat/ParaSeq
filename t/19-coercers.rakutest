@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 38;
+plan 39;
 
 my constant @list  = (^200000).List;
 my constant $batch = 16;
@@ -30,14 +30,10 @@ for 1, ParaSeq.default-degree {
       $BagHash, ".BagHash with degree $_";
     is-deeply @list.&hyperize($batch, $_).Bool,
       $Bool, ".Bool with degree $_";
-    is-deeply @list.&hyperize($batch, $_).eager,
-      @list, ".eager with degree $_";
     is-deeply @list.&hyperize($batch, $_).Hash,
       $Hash, ".Hash with degree $_";
     is-deeply @list.&hyperize($batch, $_).Int,
       $Int, ".Int with degree $_";
-    is-deeply @list.&hyperize($batch, $_).list,
-      @list, ".list with degree $_";
     is-deeply @list.&hyperize($batch, $_).List,
       @list, ".List with degree $_";
     is-deeply @list.&hyperize($batch, $_).Map,
@@ -60,6 +56,16 @@ for 1, ParaSeq.default-degree {
       $Str, ".Str with degree $_";
     is-deeply @list.&hyperize($batch, $_).Supply,
       $Supply, ".Supply with degree $_";
+
+    is-deeply @list.&hyperize($batch, $_).eager,
+      @list, ".eager with degree $_";
+    is-deeply @list.&hyperize($batch, $_).list,
+      @list, ".list with degree $_";
+
+    unless $_ == 1 {
+        my $seq := @list.&hyperize($batch, $_);
+        cmp-ok $seq.values, &[=:=], $seq, ".values with degree $_";
+    }
 }
 
 # vim: expandtab shiftwidth=4

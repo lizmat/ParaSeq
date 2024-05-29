@@ -420,7 +420,9 @@ B<inequality>, may produce erroneous results.
 
 =head2 values
 
-L<C<.values>|https://docs.raku.org/type/List#routine_values>
+B<status>: the
+L<C<.values>|https://docs.raku.org/type/List#routine_values> is
+basically a no-op, so it returns the invocant for simplicity.
 
 =head1 COERCERS
 

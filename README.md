@@ -373,7 +373,7 @@ unique
 values
 ------
 
-[`.values`](https://docs.raku.org/type/List#routine_values)
+**status**: the [`.values`](https://docs.raku.org/type/List#routine_values) is basically a no-op, so it returns the invocant for simplicity.
 
 COERCERS
 ========
