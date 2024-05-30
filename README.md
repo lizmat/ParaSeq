@@ -118,57 +118,57 @@ method returns a `Hash` with the expected classification.
 elems
 -----
 
-**Status**: an optimized version of the [`.elems`](https://docs.raku.org/type/List#routine_elems) method has been implemented.
+An optimized version of the [`.elems`](https://docs.raku.org/type/List#routine_elems) method has been implemented.
 
 end
 ---
 
-**Status**: an optimized version of the [`.end`](https://docs.raku.org/type/List#routine_end) method has been implemented.
+An optimized version of the [`.end`](https://docs.raku.org/type/List#routine_end) method has been implemented.
 
 first
 -----
 
-**Status**: an optimized version of the [`.first`](https://docs.raku.org/type/List#routine_first) method without any arguments (as an endpoint), has been implemented.
+An optimized version of the [`.first`](https://docs.raku.org/type/List#routine_first) method without any arguments (as an endpoint), has been implemented.
 
 head
 ----
 
-**Status**: an optimized version of the [`.head`](https://docs.raku.org/type/List#method_head) method without any arguments (as an endpoint), has been implemented.
+An optimized version of the [`.head`](https://docs.raku.org/type/List#method_head) method without any arguments (as an endpoint), has been implemented.
 
 join
 ----
 
-**Status**: an optimized version of the [`.join`](https://docs.raku.org/type/List#routine_join) method has been implemented.
+An optimized version of the [`.join`](https://docs.raku.org/type/List#routine_join) method has been implemented.
 
 max
 ---
 
-The [`.max`](https://docs.raku.org/type/Any#routine_max) method, when called **without** any named arguments, provides the maximum value.
+The [`.max`](https://docs.raku.org/type/Any#routine_max) method, when called **without** any named arguments, provides the maximum value without any specific hypering.
 
 min
 ---
 
-The [`.min`](https://docs.raku.org/type/Any#routine_min) method, when called **without** any named arguments, provides the minimum value.
+The [`.min`](https://docs.raku.org/type/Any#routine_min) method, when called **without** any named arguments, provides the minimum value without any specific hypering.
 
 minmax
 ------
 
-The [`.minmax`](https://docs.raku.org/type/Any#routine_minmax) method, when called **without** any named arguments, provides a `Range` with the minimum value and the maximum value as endpoints.
+An optimized version of the [`.minmax`](https://docs.raku.org/type/Any#routine_minmax) method has been implemented.
 
 reduce
 ------
 
-**Status**: an optimized version of the [`.reduce`](https://docs.raku.org/type/List#routine_reduce) method has been implemented, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
+An optimized version of the [`.reduce`](https://docs.raku.org/type/List#routine_reduce) method has been implemented, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
 
 sum
 ---
 
-**Status**: an optimized version of the [`.sum`](https://docs.raku.org/type/List#routine_sum) method has been implemented.
+An optimized version of the [`.sum`](https://docs.raku.org/type/List#routine_sum) method has been implemented.
 
 tail
 ----
 
-**Status**: an optimized version of the [`.tail`](https://docs.raku.org/type/List#method_tail) method without any arguments (as an endpoint), has been implemented.
+An optimized version of the [`.tail`](https://docs.raku.org/type/List#method_tail) method without any arguments (as an endpoint), has been implemented.
 
 INTERFACE METHODS
 =================

@@ -11,6 +11,9 @@ Revision history for ParaSeq
     - Added partially optimized ".min" and tests
     - Added partially optimized ".maxpairs" and tests
     - Added partially optimized ".minpairs" and tests
+    - Added optimized ".minmax" and tests
+    - Removed "Status" from all of the endpoint methods
+      as they now all have their final implmentation
 
 0.0.6  2024-05-28T20:46:35+02:00
     - Added ".list" coercer

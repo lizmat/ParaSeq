@@ -736,7 +736,66 @@ class ParaSeq does Sequence {
     }
 
     proto method minmax(|) {*}
-    multi method minmax(ParaSeq:D: &by = &[cmp]) { self.Seq.minmax(&by) }
+    multi method minmax(ParaSeq:D: &by = &[cmp]) {
+        self.fail-iterator-cannot-be-lazy('.minmax') if self.is-lazy;
+
+        # Logic for joining a buffer
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input is raw, $semaphore) {
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
+
+                my $min := my $max := nqp::atpos($input,0);
+
+                my uint $elems = nqp::elems($input);
+                my uint $i;
+                nqp::while(
+                  nqp::islt_i(++$i,$elems),  # intentionally skip first
+                  nqp::stmts(
+                    my $value := nqp::atpos($input,$i);
+                    nqp::if(
+                      nqp::islt_i(by($value,$min),0),
+                      $min := $value
+                    ),
+                    nqp::if(
+                      nqp::isgt_i(by($value,$max),0),
+                      $max := $value
+                    )
+                  )
+                );
+
+                my $output := nqp::create(IB);
+                nqp::push($output,$min);
+                nqp::push($output,$max);
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Start processing and return result of batches
+        my $batches := self!start(&processor).IterationBuffer;
+
+        # Post process the result
+        my $min := nqp::shift($batches);
+        my $max := nqp::shift($batches);
+        my $value;
+
+        nqp::while(
+          nqp::elems($batches),
+          nqp::stmts(
+            nqp::if(
+              nqp::islt_i(by(($value := nqp::shift($batches)),$min),0),
+              ($min := $value)
+            ),
+            nqp::if(
+              nqp::isgt_i(by(($value := nqp::shift($batches)),$max),0),
+              ($max := $value)
+            )
+          )
+        );
+
+        Range.new($min, $max)
+    }
 
     proto method pick(|) {*}
     multi method pick(ParaSeq:D:) { self.List.pick }
@@ -1148,7 +1207,7 @@ class ParaSeq does Sequence {
                 my uint $i;
                 my  int $cmp;
                 nqp::while(
-                  nqp::islt_i(++$i,$elems),
+                  nqp::islt_i(++$i,$elems),  # intentionally skip first
                   nqp::if(
                     ($cmp = by(nqp::atpos($input,$i), $limit)),
                     nqp::if(                          # not Same as limit

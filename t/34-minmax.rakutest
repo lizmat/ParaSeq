@@ -1,0 +1,16 @@
+use Test;
+use ParaSeq;
+
+plan 2;
+
+my constant $elems  = 200000;
+my constant @list   = (^$elems).reverse.List;
+my constant $minmax = @list.minmax;
+my constant $batch  = 16;
+
+for 1, ParaSeq.default-degree {
+    is-deeply @list.&hyperize($batch, $_).minmax, $minmax,
+      ".minmax with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4

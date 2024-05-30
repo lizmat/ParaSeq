@@ -159,53 +159,55 @@ added for this method at this point.
 
 =head2 elems
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.elems>|https://docs.raku.org/type/List#routine_elems> method
 has been implemented.
 
 =head2 end
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.end>|https://docs.raku.org/type/List#routine_end> method has
 been implemented.
 
 =head2 first
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.first>|https://docs.raku.org/type/List#routine_first> method
 without any arguments (as an endpoint), has been implemented.
 
 =head2 head
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.head>|https://docs.raku.org/type/List#method_head> method
 without any arguments (as an endpoint), has been implemented.
 
 =head2 join
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.join>|https://docs.raku.org/type/List#routine_join> method
 has been implemented.
 
 =head2 max
 
-The L<C<.max>|https://docs.raku.org/type/Any#routine_max> method, when
-called B<without> any named arguments, provides the maximum value.
+The L<C<.max>|https://docs.raku.org/type/Any#routine_max> method,
+when called B<without> any named arguments, provides the maximum
+value without any specific hypering.
 
 =head2 min
 
-The L<C<.min>|https://docs.raku.org/type/Any#routine_min> method, when
-called B<without> any named arguments, provides the minimum value.
+The L<C<.min>|https://docs.raku.org/type/Any#routine_min> method,
+when called B<without> any named arguments, provides the minimum
+value without any specific hypering.
 
 =head2 minmax
 
-The L<C<.minmax>|https://docs.raku.org/type/Any#routine_minmax> method,
-when called B<without> any named arguments, provides a C<Range> with
-the minimum value and the maximum value as endpoints.
+An optimized version of the
+L<C<.minmax>|https://docs.raku.org/type/Any#routine_minmax> method
+has been implemented.
 
 =head2 reduce
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.reduce>|https://docs.raku.org/type/List#routine_reduce> method
 has been implemented, but will only produce the correct results if
 the order of the values in the source is B<not> important to determine
@@ -213,13 +215,13 @@ the final result.
 
 =head2 sum
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.sum>|https://docs.raku.org/type/List#routine_sum> method has
 been implemented.
 
 =head2 tail
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.tail>|https://docs.raku.org/type/List#method_tail> method
 without any arguments (as an endpoint), has been implemented.
 
