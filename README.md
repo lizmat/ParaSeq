@@ -101,19 +101,17 @@ These methods return a single value that could be considered a reduction of the 
 are
 ---
 
-**Status**: since the [`.are`](https://docs.raku.org/type/Any#method_are) is already **highly** optimized, adding specific hypering would only slow down execution.
+Because the [`.are`](https://docs.raku.org/type/Any#method_are) method is already **highly** optimized, adding specific hypering would only slow down execution. So no specific hypering support has been added.
 
 categorize
 ----------
 
-**Status**: since the [`.categorize`](https://docs.raku.org/type/List#routine_categorize) method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
+Because the [`.categorize`](https://docs.raku.org/type/List#routine_categorize) method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
 
 classify
 --------
 
-method returns a `Hash` with the expected classification.
-
-**Status**: since the [`.classify`](https://docs.raku.org/type/List#routine_classify) method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
+Because the [`.classify`](https://docs.raku.org/type/List#routine_classify) method produces a Hash, putting together the `Hash` results of each batch in a correct manner, would be very complicated and potentially CPU intensive. Therefore, **no** specific hypering logic has been added for this method at this point.
 
 elems
 -----
