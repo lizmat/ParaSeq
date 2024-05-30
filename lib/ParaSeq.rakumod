@@ -459,7 +459,7 @@ class ParaSeq does Sequence {
       uint $auto,
       uint $degree,
       uint $stop-after,
-           $buffer,
+           $buffer is raw,
            $source
     ) is hidden-from-backtrace {
         X::Invalid::Value.new(:$method, :name<batch>,  :value($batch)).throw
@@ -474,9 +474,9 @@ class ParaSeq does Sequence {
         nqp::bindattr_i($self, ParaSeq, '$!degree',     $degree    );
         nqp::bindattr_i($self, ParaSeq, '$!stop-after', $stop-after);
 
-        nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $*SCHEDULER         );
-        nqp::bindattr($self, ParaSeq, '$!buffer',    nqp::decont($buffer));
-        nqp::bindattr($self, ParaSeq, '$!source',    $source             );
+        nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $*SCHEDULER );
+        nqp::bindattr($self, ParaSeq, '$!buffer',    $buffer     );
+        nqp::bindattr($self, ParaSeq, '$!source',    $source     );
         $self
     }
 
