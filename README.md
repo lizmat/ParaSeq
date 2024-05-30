@@ -647,9 +647,11 @@ If step 1 and 2 didn't result in a premature return, then a `ParaSeq` object is 
 Step 4: an interface method is called
 -------------------------------------
 
-Each interface method decides whether they can support an optimized hypered operation. If does **not** support hypered operation, it returns a clone of the original invocant, but with an adapted source iterator: a `BufferIterator` object.
+Each interface method decides whether they can support an optimized hypered operation. If does **not** support hypered operation, a special `BufferIterator` is created. This iterator takes the buffer and the source iterator from step 2, that will first deliver the values from the buffer, and then the values from the source iterator (until that is exhausted).
 
-This iterator takes the buffer from step 2, and the source iterator and will first deliver the values from the buffer, and then the values from the source iterator (until it is exhausted). Then a `Seq` or `List` (as appropriate) is created from this iterator and the core method with same name is called on this `Seq` or `List`, effectively producing the expected results, but in a non-parallelized way.
+The following step then depends on whether the method is an endpoint (such as `max`) or a coercer (such as `Str`). If it is, then the `BufferIterator` will be wrapped in a standard `Seq` object and the core equivalent of that method will be called on it and its result returned.
+
+If it is an other interface method, then a clone of the original invocant is created with the `BufferIterator` object as its source iterator. And that is then returned.
 
 If the method **can** be parallized, then we continue.
 
@@ -701,7 +703,15 @@ The batcher is basically a loop that blocks on the messages from the deliverer. 
 Step 10: start delivering
 -------------------------
 
-At this point the `ParaSeq` object is returned by `&hyperize` and
+At this point a `ParaIterator` object is created and installed as the (result) `.iterator` of the invocant. The paralellizing logic in the hypered variant of the method is started, which then in turn starts feeding the `ParaIterator`.
+
+It is then up to the code that iterators over the (result) iterator to consume the values delivered. If no values are being delivered, production of values will halt after all inital "degree" batches have been produced.
+
+When the deliverer is done with a result batch, it removes all available statistics information and adds these to the `stats` of the `ParaSeq` object. It also uses this information to calculate an optimum batch size for any other batches to be processed (unless this is inhibited by the `:!auto` named argument to `.&hyperize`).
+
+The algorithm for batch size calculation is pretty simple at the moment. To allow for optimum responsiveness of the program, as well as any other processes running on the computer, a time slice of 500_000 nanoseconds has been chosen.
+
+If a batch took almost exactly that amount of time to produce values, then the size of that batch is assumed to be the optimum size. If the batch took longer, then the batch size should be reduced. If the batch took less than that to complete, then the batch size should be increased.
 
 AUTHOR
 ======
