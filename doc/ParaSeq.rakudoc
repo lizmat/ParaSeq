@@ -363,7 +363,7 @@ hypering logic has been added for this method.
 =head2 roll
 
 B<Status>: the nature of the
-L<C<.roll>|https://docs.raku.org/type/List#routine_roll> method 
+L<C<.roll>|https://docs.raku.org/type/List#routine_roll> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
@@ -746,6 +746,150 @@ short-circuited with a C<last> control statement.
 =head3 LEAVE
 
 Called after each iteration.
+
+=head1 THEORY OF OPERATION
+
+A description of the program logic when you call C<.&hyperize> on an
+object.
+
+=head2 Step 1: is degree > 1
+
+If the degree is 1, then there's nothing to parallelize.  The
+C<&hyperize> sub will return its first argument.  Since C<.&hyperize>
+will most likely mostly be called as a method, the first argument will
+be described as the "invocant".
+
+=head2 Step 2: fetch the initial batch
+
+Obtain an iterator from the invocant and read as many items into an
+C<IterationBuffer> as the initial batch size indicates.  If this
+exhausted the source iterator, then return a C<Seq> on that
+C<IterationBuffer>.  This also effectively inhibits any parallelization.
+
+=head2 Step 3: create a ParaSeq
+
+If step 1 and 2 didn't result in a premature return, then a C<ParaSeq>
+object is created and returned.  Apart from the initial
+C<IterationBuffer> and source iterator, it also contains:
+
+=item the initial batch size
+=item the degree (max number of worker threads)
+=item the "auto" flag
+=item any "stop after" value
+=item the $*SCHEDULER value
+
+=head2 Step 4: an interface method is called
+
+Each interface method decides whether they can support an optimized
+hypered operation.  If does B<not> support hypered operation, it
+returns a clone of the original invocant, but with an adapted source
+iterator: a C<BufferIterator> object.
+
+This iterator takes the buffer from step 2, and the source iterator
+and will first deliver the values from the buffer, and then the values
+from the source iterator (until it is exhausted).  Then a C<Seq> or
+C<List> (as appropriate) is created from this iterator and the core
+method with same name is called on this C<Seq> or C<List>, effectively
+producing the expected results, but in a non-parallelized way.
+
+If the method B<can> be parallized, then we continue.
+
+=head2 Step 5: check granularity of initial batch
+
+Some methods (such as C<map> and C<grep>) B<may> require more than 1
+value per iteration (the granularity).  Batches need to have a size with
+the correct granularity, otherwise processing a batch may fail at the
+last iteration for lack of positional arguments.
+
+So read additional values from the source iterator until the granularity
+is correct.
+
+=head2 Step 6: keep producers in check
+
+One of the issues with hypering, is that multiple threads can easily
+produce so many values that the deliverer can be overwhelmed in the
+worst case.  Or at least, it could be wasteful in resources because it
+would produce way more values than would actually need to be delivered.
+For example:
+
+=begin code :lang<raku>
+
+say (^Inf).&hyperize.map(*.is-prime)[999999];  # the millionth prime number
+
+=end code
+
+One would not want the parallelization to calculate 1.2 million prime
+numbers while only needing 1 million.  Yet, this will happen quite
+easily if there is not enough
+L<"back pressure"|https://medium.com/@jayphelps/backpressure-explained-the-flow-of-data-through-software-2350b3e77ce7>.
+
+So the thread delivering values, needs to be able to tell the batcher
+when it is ok to schedule another batch for processing.  This is
+done through a C<ParaQueue> object (a low-level blocking concurrent
+queue to which the delivering thread will push whenever it has delivered
+the results of a result batch.  Since "back pressure queue" is a bit
+of a mouthful, this is being referred to as the "pressure queue".
+
+The deliverer is also responsible for telling the batcher what it
+thinks the best size for the next batch is.  See Step 6.
+
+To get things started, a pressure queue is set up with various
+batch sizes (one for each degree) so that maximally that many
+threads can be started.  By using variable sizes, the delivery
+iterator can more quickly decide what the optimum size is for the
+given workload because the different batch sizes produce different
+average time needed per processed value.  Which is used to calculate
+the optimum batch size.
+
+=head2 Step 7: set up the result queue
+
+The result queue is where all of the worker threads post the result
+of processing their batch.  The result queue is a C<ParaQueue> of
+C<ParaQueue>s.  Whenever the batcher is told that it may queue up
+the next batch, the batcher also pushes a new C<ParaQueue> object to
+the result queue B<and> passes that C<ParaQueue> object to the worker
+thread.  So that when the worker thread is done processing, it can
+push its result to B<that> C<ParaQueue>.
+
+The C<ParaQueue> that is pushed to the result queue by the batcher
+ensures that the order in which batches of work are handed out, will
+also be the order in which the results will be delivered.  The fact
+that the result of processing is pushed to this C<ParaQueue> itself,
+makes the deliverer block until the worker thread has pushed its
+result (even if other threads may have been ready earlier).
+
+=head2 Step 8: set up the waiting queue
+
+To communicate back performance statistics from a worker thread
+finishing their work, another C<ParaQueue> is created.  Its sole
+purpose is to collect all C<ParaStats> objects that each worker
+thread has completed B<as soon as they are done>.  It basically
+also represents the number of result batches that are waiting
+to be delivered: hence the name "waiting queue".
+
+This queue is inspected by the delivery thread whenever it has
+completed delivery of a batch.  It's possible that this queue is
+empty.  It can also contain the statistics of more than one worker
+thread.
+
+=head2 Step 9: start the batcher thread
+
+The batcher thread keeps running until the source iterator is exhausted.
+When it is exhausted, it pushes an C<IterationEnd> to the result queue,
+indicating that no more batches will be coming.  It's the only time
+a non-C<ParaQueue> object is pushed to the result queue.
+
+The batcher is basically a loop that blocks on the messages from the
+deliverer.  Whenever a message is received (with the proposed batch
+size, calculated from any available performance statistics), it
+adjusts for correct granularity (as the deliverer is unaware of any
+granularity restrictions).  The batcher then fetches that many values
+from the source iterator and schedules another job for a worker
+thread with the values obtained (if any).
+
+=head2 Step 10: start delivering
+
+At this point the C<ParaSeq> object is returned by C<&hyperize> and
 
 =head1 AUTHOR
 
