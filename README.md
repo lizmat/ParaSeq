@@ -128,7 +128,7 @@ An optimized version of the [`.end`](https://docs.raku.org/type/List#routine_end
 first
 -----
 
-An optimized version of the [`.first`](https://docs.raku.org/type/List#routine_first) method without any arguments (as an endpoint), has been implemented.
+The [`.first`](https://docs.raku.org/type/List#routine_first) method is supported without any specific hypering support added as it turned out to be impossible to make it faster..
 
 head
 ----
@@ -206,11 +206,6 @@ duckmap
 -------
 
 [`.duckmap`](https://docs.raku.org/type/Any#method_duckmap)
-
-first
------
-
-[`.first`](https://docs.raku.org/type/List#routine_first)
 
 flat
 ----
@@ -565,7 +560,7 @@ Batch sizes that are too big, have a tendency to not use all of the CPUs (becaus
 
 Batch sizes that are too small, have a tendency to have their resource usage drowned out by the overhead of batching and dispatching to threads.
 
-This implementation automatically adapts batch sizes from the originally (implicitely) specified batch size for better throughput and resource usage. If this feature is not desired, the `:!auto` argumennt can be to switch automatic batch size adjustment off.
+This implementation automatically adapts batch sizes from the originally (implicitely) specified batch size for better throughput and resource usage. If this feature is not desired, the `:!auto` argument can be used to switch automatic batch size adjustment off.
 
 Unnecessary parallelization
 ---------------------------

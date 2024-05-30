@@ -4,7 +4,6 @@ use ParaSeq;
 plan 22;
 
 my constant $elems = 200000;
-my constant $batch = 16;
 my constant @list  = (^$elems).reverse.List;
 
 my constant $grepper   = * %% 2;
@@ -17,6 +16,8 @@ my constant $first2p   = @list.first($grepper, :p);
 my constant $first2pe  = @list.first($grepper, :p, :end);
 my constant $first2kv  = @list.first($grepper, :kv);
 my constant $first2kve = @list.first($grepper, :kv, :end);
+
+my constant $batch = 16;
 
 for 1, ParaSeq.default-degree {
     is-deeply @list.&hyperize($batch, $_).first, $first,

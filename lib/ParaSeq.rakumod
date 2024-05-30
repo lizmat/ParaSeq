@@ -704,7 +704,19 @@ class ParaSeq does Sequence {
           !! self!count - 1
     }
 
+    proto method first(|) {*}
     multi method first(ParaSeq:D:) { self.head }
+    multi method first(ParaSeq:D: Callable:D $matcher) {
+        self.Seq.first($matcher, |%_)
+    }
+    multi method first(ParaSeq:D: $matcher) {
+        self.Seq.first($matcher, |%_)
+    }
+    multi method first(ParaSeq:D: $matcher, :$end!) {
+        $end
+          ?? self.List.first($matcher, :end, |%_)
+          !! self.first($matcher, |%_)
+    }
 
     proto method head(|) {*}
     multi method head(ParaSeq:D:) {
@@ -919,20 +931,6 @@ class ParaSeq does Sequence {
     proto method batch(|) {*}
     multi method batch(ParaSeq:D: Int:D :$elems!) { self!batch($elems,1) }
     multi method batch(ParaSeq:D: Int:D  $elems ) { self!batch($elems,1) }
-
-#- first -----------------------------------------------------------------------
-
-    multi method first(ParaSeq:D: Callable:D $matcher) {
-        self.Seq.first($matcher, |%_)
-    }
-    multi method first(ParaSeq:D: $matcher) {
-        self.Seq.first($matcher, |%_)
-    }
-    multi method first(ParaSeq:D: $matcher, :$end!) {
-        $end
-          ?? self.List.first($matcher, :end, |%_)
-          !! self.first($matcher, |%_)
-    }
 
 #- grep ------------------------------------------------------------------------
 
