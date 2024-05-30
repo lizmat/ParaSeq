@@ -443,136 +443,126 @@ In alphabetical order:
 
 =head2 Array
 
-B<Status>: the L<C<Array>|https://docs.raku.org/type/Array> coercer
-is implemented: it removes all hypering information from its invocant.
+The L<C<Array>|https://docs.raku.org/type/Array> coercer has been
+implemented: it removes all hypering information from its invocant.
 
 =head2 Bag
 
-B<Status>: putting together the
-L<C<Bag>|https://docs.raku.org/type/Bag> of each batch in a correct
-manner, would be complicated and potentially CPU intensive.
-Therefore, B<no> specific hypering logic has been added for this
-coercer at this point.
+Putting together the L<C<Bag>|https://docs.raku.org/type/Bag> of each
+batch in a correct manner, would be complicated and potentially CPU
+intensive.  Therefore, B<no> specific hypering logic has been added
+for this coercer at this point.
 
 =head2 BagHash
 
-B<Status>: putting together the
-L<C<BagHash>|https://docs.raku.org/type/BagHash> of each batch in a
-correct manner, would be complicated and potentially CPU intensive.
-Therefore, B<no> specific hypering logic has been added for this
-coercer at this point.
+Putting together the L<C<BagHash>|https://docs.raku.org/type/BagHash>
+of each batch in a correct manner, would be complicated and
+potentially CPU intensive.  Therefore, B<no> specific hypering logic
+has been added for this coercer at this point.
 
 =head2 Bool
 
-B<Status>: an optimized version of the
-L<C<Bool>|https://docs.raku.org/type/Bool> coercer has been
-implemented.
+An optimized version of the L<C<Bool>|https://docs.raku.org/type/Bool>
+coercer has been implemented.
 
 =head2 eager
 
-B<Status>: the L<C<.eager>|https://docs.raku.org/type/List#routine_eager>
-method is functionally the same as the C<.List>, and as such is
-implemented.
+The L<C<.eager>|https://docs.raku.org/type/List#routine_eager> method
+is functionally the same as the C<.List>, and has been implemented as
+such.
 
 =head2 Hash
 
-B<Status>: putting together the
-L<C<Hash>|https://docs.raku.org/type/Hash> of each batch in a
-correct manner, would be complicated and potentially CPU intensive.
-Therefore, B<no> specific hypering logic has been added for this
-coercer at this point.
+Putting together the L<C<Hash>|https://docs.raku.org/type/Hash> of
+each batch in a correct manner, would be complicated and potentially
+CPU intensive.  Therefore, B<no> specific hypering logic has been
+added for this coercer at this point.
 
 =head2 Int
 
-B<Status>: an optimized version of the
-L<C<Int>|https://docs.raku.org/type/Int> coercer has been implemented.
+An optimized version of the L<C<Int>|https://docs.raku.org/type/Int>
+coercer has been implemented.
 
 =head2 IterationBuffer
 
-B<Status>: the
-L<C<IterationBuffer>|https://docs.raku.org/type/IterationBuffer>
-method collects the result of the invocant in an C<IterationBuffer>
+The L<C<IterationBuffer>|https://docs.raku.org/type/IterationBuffer>
+coercer collects the result of the invocant in an C<IterationBuffer>
 and returns that.
 
 =head2 list
 
-B<Status>: the L<C<list>|https://docs.raku.org/routine/list> coercer
-is implemented: it creates a C<List> object with the object's
-iterator as its "todo" (so no elements are reified until they are
-actually demanded).  And thus removes all hypering information.
+The L<C<list>|https://docs.raku.org/routine/list> coercer is
+implemented: it creates a C<List> object with the object's iterator
+as its "todo" (so no elements are reified until they are actually
+demanded).  And thus removes all hypering information.
 
 =head2 List
 
-B<Status>: the L<C<List>|https://docs.raku.org/type/List> coercer
-is implemented: it creates a fully reified C<List> and thus removes
-all hypering information.
+The L<C<List>|https://docs.raku.org/type/List> coercer has been
+implemented: it creates a fully reified C<List> and thus removes all
+hypering information.
 
 =head2 Map
 
-B<Status>: putting together the
-L<C<Map>|https://docs.raku.org/type/Map> of each batch in a
-correct manner, would be complicated and potentially CPU intensive.
-Therefore, B<no> specific hypering logic has been added for this
-coercer at this point.
+Putting together the L<C<Map>|https://docs.raku.org/type/Map> of each
+batch in a correct manner, would be complicated and potentially CPU
+intensive.  Therefore, B<no> specific hypering logic has been added
+for this coercer at this point.
 
 =head2 Mix
 
-B<Status>: putting together the
-L<C<Mix>|https://docs.raku.org/type/Mix> of each batch in a
-correct manner, would be complicated and potentially CPU intensive.
-Therefore, B<no> specific hypering logic has been added for this
-coercer at this point.
+Putting together the L<C<Mix>|https://docs.raku.org/type/Mix> of
+each batch in a correct manner, would be complicated and potentially
+CPU intensive.  Therefore, B<no> specific hypering logic has been
+added for this coercer at this point.
 
 =head2 MixHash
 
-B<Status>: putting together the
-L<C<MixHash>|https://docs.raku.org/type/MixHash> of each batch in a
-correct manner, would be complicated and potentially CPU intensive.
-Therefore, B<no> specific hypering logic has been added for this
-coercer at this point.
+Putting together the L<C<MixHash>|https://docs.raku.org/type/MixHash>
+of each batch in a correct manner, would be complicated and potentially
+CPU intensive.  Therefore, B<no> specific hypering logic has been added
+for this coercer at this point.
 
 =head2 Numeric
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<Int>|https://docs.raku.org/type/Numeric> coercer has been
 implemented.
 
 =head2 Seq
 
-B<Status>: the L<C<Seq>|https://docs.raku.org/type/Seq> coercer
-is implemented: it removes all hypering information from its invocant.
+The L<C<Seq>|https://docs.raku.org/type/Seq> coercer has been
+implemented: it removes all hypering information from its invocant.
 
 =head2 serial
 
-B<Status>: the
-L<C<.serial>|https://docs.raku.org/type/HyperSeq#method_serial> method
-is functionally the same as the C<.Seq>, and as such is implemented.
+The L<C<.serial>|https://docs.raku.org/type/HyperSeq#method_serial>
+method is functionally the same as the C<.Seq>, and has been
+implemented as such.
 
 =head2 Set
 
-B<Status>: putting together the
-L<C<Set>|https://docs.raku.org/type/Set> of each batch in a
-correct manner, would be complicated and potentially CPU intensive.
-Therefore, B<no> specific hypering logic has been added for this
-coercer at this point.
+Putting together the L<C<Set>|https://docs.raku.org/type/Set> of each
+batch in a correct manner, would be complicated and potentially CPU
+intensive.  Therefore, B<no> specific hypering logic has been added
+for this coercer at this point.
 
 =head2 SetHash
 
-B<Status>: putting together the
-L<C<SetHash>|https://docs.raku.org/type/SetHash> of each batch in a
-correct manner, would be complicated and potentially CPU intensive.
-Therefore, B<no> specific hypering logic has been added for this
-coercer at this point.
+Putting together the L<C<SetHash>|https://docs.raku.org/type/SetHash>
+of each batch in a correct manner, would be complicated and
+potentially CPU intensive.  Therefore, B<no> specific hypering logic
+has been added for this coercer at this point.
 
 =head2 Slip
 
-B<Status>: the L<C<Slip>|https://docs.raku.org/type/Slip> coercer
-is implemented: it removes all hypering information from its invocant.
+The L<C<Slip>|https://docs.raku.org/type/Slip> coercer has been
+implemented: it removes all hypering information from its invocant.
 
 =head2 Str
 
-B<Status>: an optimized version of the
-L<C<Str>|https://docs.raku.org/type/Str> coercer has been implemented.
+An optimized version of the L<C<Str>|https://docs.raku.org/type/Str>
+coercer has been implemented.
 
 =head1 PUBLIC CLASSES
 
