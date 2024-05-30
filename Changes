@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.0.7  2024-05-30T14:24:50+02:00
     - Added optimized ".batch" and tests
     - Added partially optimized ".rotor" and tests
     - Updated status of ".eager" and added tests
