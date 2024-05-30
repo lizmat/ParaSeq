@@ -207,9 +207,10 @@ has been implemented.
 
 An optimized version of the
 L<C<.reduce>|https://docs.raku.org/type/List#routine_reduce> method
-has been implemented, but will only produce the correct results if
-the order of the values in the source is B<not> important to determine
-the final result.
+has been implemented.
+
+B<Caveat>: will only produce the correct results if the order of the
+values is B<not> important to determine the final result.
 
 =head2 sum
 
@@ -273,7 +274,10 @@ L<C<.grep>|https://docs.raku.org/type/List#routine_grep>
 
 =head2 head
 
-L<C<.head>|https://docs.raku.org/type/List#method_head>
+B<Status>: the L<C<.head>|https://docs.raku.org/type/List#method_head>
+method is already very simple, and adding hypering overhead would do
+just that: add overhead.  Therefore, B<no> specific hypering logic has
+been added for this method.
 
 =head2 invert
 
@@ -337,9 +341,9 @@ L<C<.permutations>|https://docs.raku.org/type/List#routine_permutations>
 =head2 pick
 
 B<Status>: the nature of the
-L<C<.pick>|https://docs.raku.org/type/List#routine_pick> basically
-makes it impossible to hyper.  Therefore, B<no> specific hypering
-logic has been added for this method.
+L<C<.pick>|https://docs.raku.org/type/List#routine_pick> method
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for this method.
 
 =head2 produce
 
@@ -396,7 +400,10 @@ L<C<.squish>|https://docs.raku.org/type/Any#method_squish>
 
 =head2 tail
 
-L<C<.tail>|https://docs.raku.org/type/List#method_tail>
+B<Status>: the nature of the
+L<C<.tail>|https://docs.raku.org/type/List#method_tail> method
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for this method.
 
 =head2 toggle
 

@@ -156,7 +156,9 @@ An optimized version of the [`.minmax`](https://docs.raku.org/type/Any#routine_m
 reduce
 ------
 
-An optimized version of the [`.reduce`](https://docs.raku.org/type/List#routine_reduce) method has been implemented, but will only produce the correct results if the order of the values in the source is **not** important to determine the final result.
+An optimized version of the [`.reduce`](https://docs.raku.org/type/List#routine_reduce) method has been implemented.
+
+**Caveat**: will only produce the correct results if the order of the values is **not** important to determine the final result.
 
 sum
 ---
@@ -223,7 +225,7 @@ grep
 head
 ----
 
-[`.head`](https://docs.raku.org/type/List#method_head)
+**Status**: the [`.head`](https://docs.raku.org/type/List#method_head) method is already very simple, and adding hypering overhead would do just that: add overhead. Therefore, **no** specific hypering logic has been added for this method.
 
 invert
 ------
@@ -283,7 +285,7 @@ permutations
 pick
 ----
 
-**Status**: the nature of the [`.pick`](https://docs.raku.org/type/List#routine_pick) basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+**Status**: the nature of the [`.pick`](https://docs.raku.org/type/List#routine_pick) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 produce
 -------
@@ -338,7 +340,7 @@ squish
 tail
 ----
 
-[`.tail`](https://docs.raku.org/type/List#method_tail)
+**Status**: the nature of the [`.tail`](https://docs.raku.org/type/List#method_tail) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 toggle
 ------
