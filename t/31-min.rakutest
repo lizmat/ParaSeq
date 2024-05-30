@@ -1,0 +1,36 @@
+use Test;
+use ParaSeq;
+
+plan 18;
+
+my constant $elems = 200000;
+my constant @list  = (^$elems).reverse.List;
+my constant $min   = @list.min;
+my constant $minp  = @list.min(:p);
+my constant $minkv = @list.min(:kv);
+my constant $mink  = @list.min(:k);
+my constant $minv  = @list.min(:v);
+my constant $batch = 16;
+
+for 1, ParaSeq.default-degree {
+    is-deeply @list.&hyperize($batch, $_).min, $min,
+      ".min with degree = $_";
+
+    my $seq := @list.&hyperize($batch, $_).min(:p);
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $minp, ".min(:p) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).min(:kv);
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $minkv, ".min(:kv) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).min(:k);
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $mink, ".min(:k) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).min(:v);
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $minv, ".min(:v) with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4

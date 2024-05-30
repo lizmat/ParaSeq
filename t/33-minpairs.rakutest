@@ -1,0 +1,17 @@
+use Test;
+use ParaSeq;
+
+plan 4;
+
+my constant $elems = 200000;
+my constant @list  = (^$elems).reverse.List;
+my constant $minp  = @list.minpairs;
+my constant $batch = 16;
+
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize($batch, $_).minpairs;
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $minp, ".minpairs with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4

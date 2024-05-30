@@ -1,0 +1,36 @@
+use Test;
+use ParaSeq;
+
+plan 18;
+
+my constant $elems = 200000;
+my constant @list  = (^$elems).List;
+my constant $max   = @list.max;
+my constant $maxp  = @list.max(:p);
+my constant $maxkv = @list.max(:kv);
+my constant $maxk  = @list.max(:k);
+my constant $maxv  = @list.max(:v);
+my constant $batch = 16;
+
+for 1, ParaSeq.default-degree {
+    is-deeply @list.&hyperize($batch, $_).max, $max,
+      ".max with degree = $_";
+
+    my $seq := @list.&hyperize($batch, $_).max(:p);
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $maxp, ".max(:p) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).max(:kv);
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $maxkv, ".max(:kv) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).max(:k);
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $maxk, ".max(:k) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).max(:v);
+    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $maxv, ".max(:v) with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4

@@ -735,12 +735,6 @@ class ParaSeq does Sequence {
         self!start(&processor).List.join($joiner)
     }
 
-    proto method max(|) {*}
-    multi method max(ParaSeq:D: &by = &[cmp]) { self.Seq.max(&by) }
-
-    proto method min(|) {*}
-    multi method min(ParaSeq:D: &by = &[cmp]) { self.Seq.min(&by) }
-
     proto method minmax(|) {*}
     multi method minmax(ParaSeq:D: &by = &[cmp]) { self.Seq.minmax(&by) }
 
@@ -1118,6 +1112,140 @@ class ParaSeq does Sequence {
         self!start(&processor, granularity($mapper))
     }
 
+#- max -------------------------------------------------------------------------
+
+    # Helper method for max / min / maxpairs / minpairs
+    method !limiter(
+       int $direction,  # direction for limiting: 1=max, -1=min
+           &by,         # comparison op
+      uint $p,          # 1 = want pairs
+      uint $kv?,        # 1 = want keys and values
+      uint $k?,         # 1 = want keys
+      uint $v?          # 1 = want values
+    ) {
+
+        # Sorry, we're lazy!
+        self.fail-iterator-cannot-be-lazy('.max') if self.is-lazy;
+
+        # Keeper for key values at start of a batch
+        my uint $base;
+
+        # Always produce .kv internally for convenience
+        my $SCHEDULER := $!SCHEDULER;
+        sub processor(uint $ordinal, $input is raw, $semaphore) {
+            my uint $offset = $base;
+            my uint $elems  = nqp::elems($input);
+            $base = $base + $elems;
+
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                # Initial limited value
+                nqp::push($output,nqp::clone($offset));
+                nqp::push($output,my $limit := nqp::atpos($input,0));
+
+                my uint $i;
+                my  int $cmp;
+                nqp::while(
+                  nqp::islt_i(++$i,$elems),
+                  nqp::if(
+                    ($cmp = by(nqp::atpos($input,$i), $limit)),
+                    nqp::if(                          # not Same as limit
+                      nqp::iseq_i($cmp,$direction),
+                      nqp::stmts(                     # right direction
+                        nqp::setelems($output,0),     # clean slate
+                        nqp::push($output,++$offset),
+                        nqp::push($output,$limit := nqp::atpos($input,$i))
+                      ),
+                      ++$offset                       # wrong direction
+                    ),
+                    nqp::stmts(                       # Same as limit
+                      nqp::push($output,++$offset),
+                      nqp::push($output,nqp::atpos($input,$i))
+                    )
+                  )
+                );
+
+                self!batch-done(
+                  $ordinal, $then, $input, $semaphore, $output
+                );
+            }
+        }
+
+        # Get result batches as a single result
+        my $batches := self!start(&processor).IterationBuffer;
+        my $final   := nqp::create(IB);
+
+        my $key   := nqp::shift($batches);
+        my $value := nqp::shift($batches);
+
+        # Set up result handling and store first result
+        my &resulter = $p
+          ?? { nqp::push($final,Pair.new($key,$value)) }
+          !! $kv
+            ?? { nqp::push($final,$key); nqp::push($final,$value) }
+            !! $k
+              ?? { nqp::push($final,$key)   }
+              !! { nqp::push($final,$value) }
+        resulter();
+
+        # Create final result by running over batch results
+        my $limit := $value;
+        my int $cmp;
+        nqp::while(
+          nqp::elems($batches),
+          nqp::stmts(
+            ($key   := nqp::shift($batches)),
+            ($value := nqp::shift($batches)),
+            ($cmp    = by($value, $limit)),
+            nqp::if(
+              $cmp,
+              nqp::if(                # not Same as limit
+                nqp::iseq_i($cmp,$direction),
+                nqp::stmts(           # right direction
+                  nqp::setelems($final,0),
+                  resulter()
+                )
+              ),
+              resulter()              # Same as limit
+            )
+          )
+        );
+
+        self!pass-the-chain: $final.iterator
+    }
+
+    proto method max(|) {*}
+    multi method max(ParaSeq:D: &by = &[cmp], :$p, :$kv, :$k, :$v) {
+        $p || $kv || $k || $v
+          # Not an endpoint, use our own logic
+          ?? self!limiter(1, &by, $p.Bool, $kv.Bool, $k.Bool, $v.Bool)
+          # Standard endpoint .max, nothing to optimize here
+          !! self.Seq.max(&by)
+    }
+
+#- maxpairs --------------------------------------------------------------------
+
+    proto method maxpairs(|) {*}
+    multi method maxpairs(ParaSeq:D: &by = &[cmp]) { self!limiter(1, &by, 1) }
+
+#- min -------------------------------------------------------------------------
+
+    proto method min(|) {*}
+    multi method min(ParaSeq:D: &by = &[cmp], :$p, :$kv, :$k, :$v) {
+        $p || $kv || $k || $v
+          # Not an endpoint, use our own logic
+          ?? self!limiter(-1, &by, $p.Bool, $kv.Bool, $k.Bool, $v.Bool)
+          # Standard endpoint .max, nothing to optimize here
+          !! self.Seq.min(&by)
+    }
+
+#- minpairs --------------------------------------------------------------------
+
+    proto method minpairs(|) {*}
+    multi method minpairs(ParaSeq:D: &by = &[cmp]) { self!limiter(-1, &by, 1) }
+
 #- pairs -----------------------------------------------------------------------
 
     multi method pairs(ParaSeq:D:) {
@@ -1322,46 +1450,6 @@ class ParaSeq does Sequence {
 
     multi method keys(ParaSeq:D:) {
         self!pass-the-chain: self.Seq.keys.iterator
-    }
-
-    multi method max(ParaSeq:D: &by = &[cmp], :$k!) {
-        $k
-          ?? self!pass-the-chain(self.Seq.max(&by, :k))
-          !! self.max(&by, |%_)
-    }
-    multi method max(ParaSeq:D: &by = &[cmp], :$kv!) {
-        $kv
-          ?? self!pass-the-chain(self.Seq.max(&by, :kv))
-          !! self.max(&by, |%_)
-    }
-    multi method max(ParaSeq:D: &by = &[cmp], :$p!) {
-        $p
-          ?? self!pass-the-chain(self.Seq.max(&by, :p))
-          !! self.max(&by, |%_)
-    }
-
-    multi method min(ParaSeq:D: &by = &[cmp], :$k!) {
-        $k
-          ?? self!pass-the-chain(self.Seq.min(&by, :k))
-          !! self.min(&by, |%_)
-    }
-    multi method min(ParaSeq:D: &by = &[cmp], :$kv!) {
-        $kv
-          ?? self!pass-the-chain(self.Seq.min(&by, :kv))
-          !! self.min(&by, |%_)
-    }
-    multi method min(ParaSeq:D: &by = &[cmp], :$p!) {
-        $p
-          ?? self!pass-the-chain(self.Seq.min(&by, :p))
-          !! self.min(&by, |%_)
-    }
-
-    multi method maxpairs(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.maxpairs.iterator
-    }
-
-    multi method minpairs(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.minpairs.iterator
     }
 
     multi method nodemap(ParaSeq:D: |c) {

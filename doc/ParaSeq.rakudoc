@@ -302,15 +302,21 @@ L<C<.map>|https://docs.raku.org/type/List#routine_map>
 
 =head2 max
 
-L<C<.max>|https://docs.raku.org/type/Any#routine_max>
+B<Status>: an optimized version of the
+L<C<.max>|https://docs.raku.org/type/Any#routine_max> method has been
+implemented.
 
 =head2 maxpairs
 
-L<C<.maxpairs>|https://docs.raku.org/type/Any#routine_maxpairs>
+B<Status>: an optimized version of the
+L<C<.maxpairs>|https://docs.raku.org/type/Any#routine_maxpairs> method
+has been implemented.
 
 =head2 min
 
-L<C<.min>|https://docs.raku.org/type/Any#routine_min>
+B<Status>: an optimized version of the
+L<C<.min>|https://docs.raku.org/type/Any#routine_min> method has been
+implemented.
 
 =head2 minmax
 
@@ -318,7 +324,9 @@ L<C<.minmax>|https://docs.raku.org/type/Any#routine_minmax>
 
 =head2 minpairs
 
-L<C<.minpairs>|https://docs.raku.org/type/Any#routine_minpairs>
+B<Status>: an optimized version of the
+L<C<.minpairs>|https://docs.raku.org/type/Any#routine_minpairs> method
+has been implemented.
 
 =head2 nodemap
 

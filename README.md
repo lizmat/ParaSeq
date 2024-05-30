@@ -255,17 +255,17 @@ map
 max
 ---
 
-[`.max`](https://docs.raku.org/type/Any#routine_max)
+**Status**: an optimized version of the [`.max`](https://docs.raku.org/type/Any#routine_max) method has been implemented.
 
 maxpairs
 --------
 
-[`.maxpairs`](https://docs.raku.org/type/Any#routine_maxpairs)
+**Status**: an optimized version of the [`.maxpairs`](https://docs.raku.org/type/Any#routine_maxpairs) method has been implemented.
 
 min
 ---
 
-[`.min`](https://docs.raku.org/type/Any#routine_min)
+**Status**: an optimized version of the [`.min`](https://docs.raku.org/type/Any#routine_min) method has been implemented.
 
 minmax
 ------
@@ -275,7 +275,7 @@ minmax
 minpairs
 --------
 
-[`.minpairs`](https://docs.raku.org/type/Any#routine_minpairs)
+**Status**: an optimized version of the [`.minpairs`](https://docs.raku.org/type/Any#routine_minpairs) method has been implemented.
 
 nodemap
 -------
