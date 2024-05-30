@@ -248,7 +248,7 @@ map
 max
 ---
 
-**Status**: an optimized version of the [`.max`](https://docs.raku.org/type/Any#routine_max) method has been implemented.
+**Status**: an optimized version of the [`.max`](https://docs.raku.org/type/Any#routine_max) method with named arguments, has been implemented.
 
 maxpairs
 --------
@@ -258,12 +258,7 @@ maxpairs
 min
 ---
 
-**Status**: an optimized version of the [`.min`](https://docs.raku.org/type/Any#routine_min) method has been implemented.
-
-minmax
-------
-
-[`.minmax`](https://docs.raku.org/type/Any#routine_minmax)
+**Status**: an optimized version of the [`.min`](https://docs.raku.org/type/Any#routine_min) method with named arguments, has been implemented.
 
 minpairs
 --------

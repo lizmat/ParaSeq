@@ -299,8 +299,8 @@ L<C<.map>|https://docs.raku.org/type/List#routine_map>
 =head2 max
 
 B<Status>: an optimized version of the
-L<C<.max>|https://docs.raku.org/type/Any#routine_max> method has been
-implemented.
+L<C<.max>|https://docs.raku.org/type/Any#routine_max> method with
+named arguments, has been implemented.
 
 =head2 maxpairs
 
@@ -311,12 +311,8 @@ has been implemented.
 =head2 min
 
 B<Status>: an optimized version of the
-L<C<.min>|https://docs.raku.org/type/Any#routine_min> method has been
-implemented.
-
-=head2 minmax
-
-L<C<.minmax>|https://docs.raku.org/type/Any#routine_minmax>
+L<C<.min>|https://docs.raku.org/type/Any#routine_min> method with
+named arguments, has been implemented.
 
 =head2 minpairs
 
