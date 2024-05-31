@@ -392,7 +392,10 @@ L<C<.snitch>|https://docs.raku.org/type/Any#routine_snitch>
 
 =head2 sort
 
-L<C<.sort>|https://docs.raku.org/type/List#routine_sort>
+B<Status>: the nature of the
+L<C<.sort>|https://docs.raku.org/type/List#routine_sort> method
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for this method.
 
 =head2 squish
 

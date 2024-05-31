@@ -1581,8 +1581,11 @@ class ParaSeq does Sequence {
     }
 
     proto method sort(|) {*}
-    multi method sort(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.sort(|c).iterator
+    multi method sort(ParaSeq:D:) {
+        self!pass-the-chain: self.List.sort.iterator
+    }
+    multi method sort(ParaSeq:D: Callable:D $how) {
+        self!pass-the-chain: self.List.sort($how).iterator
     }
 
     proto method squish(|) {*}

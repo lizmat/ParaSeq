@@ -1,0 +1,30 @@
+use Test;
+use ParaSeq;
+
+plan 12;
+
+my constant $elems = 200000;
+my constant $batch = 16;
+my constant @list  = (^$elems).reverse.List;
+my constant @sorted  = @list.sort.List;
+my constant $asStr   = *.Str;
+my constant @sorteds = @list.sort($asStr).List;
+my constant $reverse = { $^b cmp $^a };
+my constant @sortedr = @list.sort($reverse).List;
+
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize($batch, $_).sort;
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @sorted, ".sort with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).sort($asStr);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @sorteds, ".sort(*.Str) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).sort($reverse);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @sortedr,
+      ".sort(\{ \$^b cmp \$^a }) with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4

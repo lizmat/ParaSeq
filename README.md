@@ -330,7 +330,7 @@ snitch
 sort
 ----
 
-[`.sort`](https://docs.raku.org/type/List#routine_sort)
+**Status**: the nature of the [`.sort`](https://docs.raku.org/type/List#routine_sort) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 squish
 ------
