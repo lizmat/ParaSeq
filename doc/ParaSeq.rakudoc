@@ -409,7 +409,10 @@ have no specific hypering logic.
 
 =head2 slice
 
+B<Status>: the nature of the
 L<C<.slice>|https://docs.raku.org/type/Seq#multi_method_slice>
+method basically makes it impossible to hyper.  Therefore, B<no>
+specific hypering logic has been added for this method.
 
 =head2 snitch
 

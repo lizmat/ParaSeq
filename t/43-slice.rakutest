@@ -1,0 +1,18 @@
+use Test;
+use ParaSeq;
+
+plan 4;
+
+my constant $elems  = 2_000_000;
+my constant @list   = (^$elems).List;
+my constant $slicer = 1,2,4...*;
+my constant @sliced  = @list.slice($slicer).List;
+my constant $batch  = 16;
+
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize($batch, $_).slice($slicer);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @sliced, ".slice with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4
