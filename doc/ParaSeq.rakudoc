@@ -921,6 +921,37 @@ the batch took longer, then the batch size should be reduced.  If
 the batch took less than that to complete, then the batch size should
 be increased.
 
+=head2 Decision tree
+
+=begin code
+  source
+   \- hyperize
+       |- invocant (degree == 1)
+       |- Seq      (source exhausted with initial batch)
+       |- ParaSeq
+           \- method call
+               |- endpoint
+               |- coercer
+               |- hypering
+=end code
+
+=head2 Hypering control flow
+
+=begin code
+                              ------------
+                              | producer |
+                              ------------
+                            ⬈
+-------------   -----------   ------------
+| deliverer | ⮕ | batcher | ⮕ | producer |
+-------------   -----------   ------------
+     ⬇                      ⬊
+  values                      ------------
+                              | producer |
+                              ------------
+
+=end code
+
 =head1 AUTHOR
 
 Elizabeth Mattijsen <liz@raku.rocks>

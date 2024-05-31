@@ -713,6 +713,34 @@ The algorithm for batch size calculation is pretty simple at the moment. To allo
 
 If a batch took almost exactly that amount of time to produce values, then the size of that batch is assumed to be the optimum size. If the batch took longer, then the batch size should be reduced. If the batch took less than that to complete, then the batch size should be increased.
 
+Decision tree
+-------------
+
+      source
+       \- hyperize
+           |- invocant (degree == 1)
+           |- Seq      (source exhausted with initial batch)
+           |- ParaSeq
+               \- method call
+                   |- endpoint
+                   |- coercer
+                   |- hypering
+
+Hypering control flow
+---------------------
+
+                                  ------------
+                                  | producer |
+                                  ------------
+                                ⬈
+    -------------   -----------   ------------
+    | deliverer | ⮕ | batcher | ⮕ | producer |
+    -------------   -----------   ------------
+         ⬇                      ⬊
+      values                      ------------
+                                  | producer |
+                                  ------------
+
 AUTHOR
 ======
 
