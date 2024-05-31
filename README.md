@@ -230,7 +230,7 @@ head
 invert
 ------
 
-[`.invert`](https://docs.raku.org/type/List#routine_invert)
+**Status**: the nature of the [`.invert`](https://docs.raku.org/type/List#routine_invert) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 keys
 ----
