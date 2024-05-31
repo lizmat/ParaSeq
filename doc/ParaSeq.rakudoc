@@ -369,7 +369,10 @@ hypering logic has been added for this method.
 
 =head2 produce
 
-L<C<.produce>|https://docs.raku.org/type/Any#routine_produce>
+B<Status>: the nature of the
+L<C<.produce>|https://docs.raku.org/type/Any#routine_produce> method
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for this method.
 
 =head2 repeated
 

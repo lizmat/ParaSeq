@@ -295,7 +295,7 @@ pick
 produce
 -------
 
-[`.produce`](https://docs.raku.org/type/Any#routine_produce)
+**Status**: the nature of the [`.produce`](https://docs.raku.org/type/Any#routine_produce) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 repeated
 --------
