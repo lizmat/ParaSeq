@@ -1476,6 +1476,10 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.List.collate.iterator
     }
 
+    proto method combinations(|) {*}
+    multi method combinations(ParaSeq:D:) {
+        self!pass-the-chain: self.List.combinations.iterator
+    }
     multi method combinations(ParaSeq:D: $of) {
         self!pass-the-chain: self.List.combinations($of).iterator
     }

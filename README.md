@@ -195,7 +195,7 @@ collate
 combinations
 ------------
 
-[`.combinations`](https://docs.raku.org/type/List#routine_combinations)
+**Status**: the nature of the [`.combinations`](https://docs.raku.org/type/List#routine_combinations) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 deepmap
 -------
@@ -730,11 +730,12 @@ Hypering control flow
 ---------------------
 
         /---------------------------------------------------------\
-        |               |                                         |
+        |                |                                        |
+        |               ⬇                                         |
         |         --------------                 ------------     |
         |         | statistics |         /-----⮕ | producer | ⮕ -|
         |         --------------        /        ------------     |
-        ⬇              ⬇              /                          |
+        ⬇               ⬇             /                          |
     -----------    ------------    -----------   ------------     |
     | results | ⮕ | deliverer | ⮕ | batcher | ⮕ | producer | ⮕ -|
     -----------    ------------    -----------   ------------     |

@@ -1,0 +1,22 @@
+use Test;
+use ParaSeq;
+
+plan 8;
+
+my constant $elems         = 20;
+my constant @list          = (^$elems).List;
+my constant @combinations  = @list.combinations.List;
+my constant @combinations3 = @list.combinations(3).List;
+my constant $batch         = 16;
+
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize($batch, $_).combinations;
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @combinations, ".combinations with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).combinations(3);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @combinations3, ".combinations(3) with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4

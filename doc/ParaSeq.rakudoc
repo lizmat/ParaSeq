@@ -253,7 +253,10 @@ specific hypering logic has been added for this method.
 
 =head2 combinations
 
+B<Status>: the nature of the
 L<C<.combinations>|https://docs.raku.org/type/List#routine_combinations>
+method basically makes it impossible to hyper.  Therefore, B<no>
+specific hypering logic has been added for this method.
 
 =head2 deepmap
 

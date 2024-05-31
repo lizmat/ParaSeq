@@ -4,6 +4,7 @@ Revision history for ParaSeq
     - Added Theory of operation section in documentation
     - Updated status of ".sort" and added tests
     - Updated status of ".collate" and added tests
+    - Updated status of ".combinations" and added tests
 
 0.0.7  2024-05-30T14:24:50+02:00
     - Added optimized ".batch" and tests
