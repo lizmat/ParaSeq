@@ -246,7 +246,10 @@ has been implemented.
 
 =head2 collate
 
+B<Status>: the nature of the
 L<C<.collate>|https://docs.raku.org/type/Any#method_collate>
+method basically makes it impossible to hyper.  Therefore, B<no>
+specific hypering logic has been added for this method.
 
 =head2 combinations
 
@@ -942,11 +945,12 @@ be increased.
 
 =begin code
     /---------------------------------------------------------\
-    |               |                                         |
+    |                |                                        |
+    |               ⬇                                         |
     |         --------------                 ------------     |
     |         | statistics |         /-----⮕ | producer | ⮕ -|
     |         --------------        /        ------------     |
-    ⬇              ⬇              /                          |
+    ⬇               ⬇             /                          |
 -----------    ------------    -----------   ------------     |
 | results | ⮕ | deliverer | ⮕ | batcher | ⮕ | producer | ⮕ -|
 -----------    ------------    -----------   ------------     |

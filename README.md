@@ -190,7 +190,7 @@ batch
 collate
 -------
 
-[`.collate`](https://docs.raku.org/type/Any#method_collate)
+**Status**: the nature of the [`.collate`](https://docs.raku.org/type/Any#method_collate) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 combinations
 ------------

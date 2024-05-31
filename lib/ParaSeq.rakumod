@@ -1472,8 +1472,8 @@ class ParaSeq does Sequence {
 #- interfaces that are just infectious -----------------------------------------
 
     proto method collate(|) {*}
-    multi method collate(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.collate(|c).iterator
+    multi method collate(ParaSeq:D:) {
+        self!pass-the-chain: self.List.collate.iterator
     }
 
     multi method combinations(ParaSeq:D: $of) {

@@ -3,14 +3,14 @@ use ParaSeq;
 
 plan 12;
 
-my constant $elems = 200000;
-my constant $batch = 16;
-my constant @list  = (^$elems).reverse.List;
+my constant $elems   = 200000;
+my constant @list    = (^$elems).reverse.List;
 my constant @sorted  = @list.sort.List;
 my constant $asStr   = *.Str;
 my constant @sorteds = @list.sort($asStr).List;
 my constant $reverse = { $^b cmp $^a };
 my constant @sortedr = @list.sort($reverse).List;
+my constant $batch   = 16;
 
 for 1, ParaSeq.default-degree {
     my $seq := @list.&hyperize($batch, $_).sort;
