@@ -1518,7 +1518,7 @@ class ParaSeq does Sequence {
     }
 
     multi method pairup(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.pairup.iterator
+        self!pass-the-chain: self.List.pairup.iterator
     }
 
     proto method permutations(|) {*}

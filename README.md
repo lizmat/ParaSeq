@@ -277,6 +277,11 @@ pairs
 
 **Status**: an optimized version of the [`.pairs`](https://docs.raku.org/type/List#routine_pairs) method has been implemented.
 
+pairup
+------
+
+**Status**: the nature of the [`pairup`](https://docs.raku.org/type/Any#method_pairup) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+
 permutations
 ------------
 

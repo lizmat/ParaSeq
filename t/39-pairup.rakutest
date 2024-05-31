@@ -1,0 +1,17 @@
+use Test;
+use ParaSeq;
+
+plan 4;
+
+my constant $elems    = 200000;
+my constant @list     = (^$elems).List;
+my constant @pairedup = @list.pairup.List;
+my constant $batch    = 16;
+
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize($batch, $_).pairup;
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @pairedup, ".pairup with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4
