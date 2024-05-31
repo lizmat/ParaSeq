@@ -268,7 +268,10 @@ L<C<.duckmap>|https://docs.raku.org/type/Any#method_duckmap>
 
 =head2 flat
 
-L<C<.flat>|https://docs.raku.org/type/Any#method_flat>
+B<Status>: the L<C<.flat>|https://docs.raku.org/type/Any#method_flat>
+method is already very simple, and adding hypering overhead would do
+just that: add overhead.  Therefore, B<no> specific hypering logic has
+been added for this method.
 
 =head2 flatmap
 

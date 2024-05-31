@@ -210,7 +210,7 @@ duckmap
 flat
 ----
 
-[`.flat`](https://docs.raku.org/type/Any#method_flat)
+**Status**: the [`.flat`](https://docs.raku.org/type/Any#method_flat) method is already very simple, and adding hypering overhead would do just that: add overhead. Therefore, **no** specific hypering logic has been added for this method.
 
 flatmap
 -------

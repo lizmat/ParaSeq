@@ -1493,7 +1493,7 @@ class ParaSeq does Sequence {
     }
 
     multi method flat(ParaSeq:D:) {
-        self!pass-the-chain: self.Seq.flat.iterator
+        self!pass-the-chain: self.List.flat.iterator
     }
 
     proto method flatmap(|) {*}
