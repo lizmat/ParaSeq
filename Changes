@@ -7,6 +7,7 @@ Revision history for ParaSeq
     - Updated status of ".combinations" and added tests
     - Updated status of ".flat" and added tests
     - Updated status of ".invert" and added tests
+    - Updated status of ".permutations" and added tests
 
 0.0.7  2024-05-30T14:24:50+02:00
     - Added optimized ".batch" and tests

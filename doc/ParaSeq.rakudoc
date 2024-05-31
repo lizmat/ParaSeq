@@ -349,13 +349,16 @@ has been implemented.
 =head2 pairup
 
 B<Status>: the nature of the
-L<C<pairup>|https://docs.raku.org/type/Any#method_pairup>  method
+L<C<pairup>|https://docs.raku.org/type/Any#method_pairup> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 permutations
 
+B<Status>: the nature of the
 L<C<.permutations>|https://docs.raku.org/type/List#routine_permutations>
+method basically makes it impossible to hyper.  Therefore, B<no>
+specific hypering logic has been added for this method.
 
 =head2 pick
 

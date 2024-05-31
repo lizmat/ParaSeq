@@ -1521,9 +1521,8 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.List.pairup.iterator
     }
 
-    proto method permutations(|) {*}
-    multi method permutations(ParaSeq:D: |c) {
-        self!pass-the-chain: self.List.permutations(|c).iterator
+    multi method permutations(ParaSeq:D:) {
+        self!pass-the-chain: self.List.permutations.iterator
     }
 
     multi method pick(ParaSeq:D: $what) {

@@ -285,7 +285,7 @@ pairup
 permutations
 ------------
 
-[`.permutations`](https://docs.raku.org/type/List#routine_permutations)
+**Status**: the nature of the [`.permutations`](https://docs.raku.org/type/List#routine_permutations) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 pick
 ----
