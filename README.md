@@ -364,7 +364,7 @@ tail
 toggle
 ------
 
-[`.toggle`](https://docs.raku.org/type/Any#method_toggle)
+**Status**: the nature of the [`.toggle`](https://docs.raku.org/type/Any#method_toggle) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 unique
 ------

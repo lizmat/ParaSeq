@@ -12,7 +12,8 @@ Revision history for ParaSeq
     - Updated status of ".slice" and added tests
     - Updated status of ".snip" and added tests
     - Updated status of ".skip" and added more tests
-    - Updated status of ".snitch" and more tests
+    - Updated status of ".snitch" and added tests
+    - Updated status of ".toggle" and added tests
 
 0.0.7  2024-05-30T14:24:50+02:00
     - Added optimized ".batch" and tests

@@ -1,0 +1,25 @@
+use Test;
+use ParaSeq;
+
+plan 8;
+
+my constant $elems   = 200_000;
+my constant @list    = (^$elems).List;
+my constant $toggler = (* mod 10 < 5) xx *;
+my constant @on      = @list.toggle($toggler).List;
+my constant @off     = @list.toggle(:off, $toggler).List;
+my constant $batch   = 16;
+
+for 1, ParaSeq.default-degree {
+    my $seq := @list.&hyperize($batch, $_).toggle($toggler);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @on,
+      ".toggle((* mod 10 < 5) xx *) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).toggle(:off, $toggler);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, @off,
+      ".toggle(:off, (* mod 10 < 5) xx *) with degree = $_";
+}
+
+# vim: expandtab shiftwidth=4
