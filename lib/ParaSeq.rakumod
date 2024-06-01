@@ -594,12 +594,16 @@ class ParaSeq does Sequence {
 
     # Mark the given queue as done
     method !batch-done(
-      uint $ordinal, uint $then, $input, $semaphore, $output
+      uint $ordinal,
+      uint $then,
+           $input is raw,
+           $semaphore is raw,
+           $output is raw
     ) {
 
         # No longer running, mark as discarded
         if nqp::atomicload_i($!stop) {
-            nqp::atomicadd_i($!discarded,nqp::elems(nqp::decont($output)));
+            nqp::atomicadd_i($!discarded,nqp::elems($output));
         }
 
         # Still running
@@ -612,14 +616,14 @@ class ParaSeq does Sequence {
               $!result.waiting,
               ParaStats.new(
                 $ordinal,
-                nqp::elems(nqp::decont($input)),
-                nqp::elems(nqp::decont($output)),
+                nqp::elems($input),
+                nqp::elems($output),
                 nqp::time() - $then
               )
             );
 
             # Make the produced values available to the result iterator
-            nqp::push(nqp::decont($semaphore),nqp::decont($output));
+            nqp::push($semaphore,$output);
         }
     }
 
@@ -748,7 +752,7 @@ class ParaSeq does Sequence {
 
         # Logic for joining a buffer
         my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                 my uint $then = nqp::time;
 
@@ -771,7 +775,7 @@ class ParaSeq does Sequence {
 
         # Logic for joining a buffer
         my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input is raw, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                 my uint $then = nqp::time;
 
@@ -834,7 +838,7 @@ class ParaSeq does Sequence {
 
         # Logic for reducing a buffer
         my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                 my uint $then = nqp::time;
 
@@ -856,7 +860,7 @@ class ParaSeq does Sequence {
 
         # Logic for summing a buffer
         my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                 my uint $then = nqp::time;
 
@@ -880,7 +884,7 @@ class ParaSeq does Sequence {
         my uint $base;  # base offset
 
         # Logic for queuing a buffer for .antipairs
-        sub processor(uint $ordinal, $input is raw, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             my uint $elems  = nqp::elems($input);
             $base = $base + $elems;
@@ -913,7 +917,7 @@ class ParaSeq does Sequence {
 
         # Logic for queuing a buffer for batches
         my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input is raw, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
@@ -957,7 +961,7 @@ class ParaSeq does Sequence {
         my uint $base;  # base offset for :k, :kv, :p
 
         # Logic for queuing a buffer for bare grep { }, producing values
-        sub v(uint $ordinal, $input, $semaphore) {
+        sub v(uint $ordinal, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
@@ -972,7 +976,7 @@ class ParaSeq does Sequence {
         }
 
         # Logic for queuing a buffer for grep { } :k
-        sub k(uint $ordinal, $input is raw, $semaphore) {
+        sub k(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
@@ -991,7 +995,7 @@ class ParaSeq does Sequence {
         }
 
         # Logic for queuing a buffer for grep { } :kv
-        sub kv(uint $ordinal, $input is raw, $semaphore) {
+        sub kv(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
@@ -1013,7 +1017,7 @@ class ParaSeq does Sequence {
         }
 
         # Logic for queuing a buffer for grep { } :p
-        sub p(uint $ordinal, $input is raw, $semaphore) {
+        sub p(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
@@ -1046,7 +1050,7 @@ class ParaSeq does Sequence {
         my uint $base;  # base offset for :k, :kv, :p
 
         # Logic for queuing a buffer for grep /.../
-        sub v(uint $ordinal, $input, $semaphore) {
+        sub v(uint $ordinal, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
@@ -1062,7 +1066,7 @@ class ParaSeq does Sequence {
         }
 
         # Logic for queuing a buffer for grep /.../ :k
-        sub k(uint $ordinal, $input is raw, $semaphore) {
+        sub k(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
@@ -1081,7 +1085,7 @@ class ParaSeq does Sequence {
         }
 
         # Logic for queuing a buffer for grep /.../ :kv
-        sub kv(uint $ordinal, $input is raw, $semaphore) {
+        sub kv(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
@@ -1103,7 +1107,7 @@ class ParaSeq does Sequence {
         }
 
         # Logic for queuing a buffer for grep /.../ :p
-        sub p(uint $ordinal, $input is raw, $semaphore) {
+        sub p(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
@@ -1135,7 +1139,7 @@ class ParaSeq does Sequence {
         my uint $base;  # base offset
 
         # Logic for queuing a buffer for .keys
-        sub processor(uint $ordinal, $input is raw, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             my uint $elems  = nqp::elems($input);
             $base = $base + $elems;
@@ -1168,7 +1172,7 @@ class ParaSeq does Sequence {
 
         # Logic for queuing a buffer for map
         my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
@@ -1207,7 +1211,7 @@ class ParaSeq does Sequence {
 
         # Always produce .kv internally for convenience
         my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input is raw, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             my uint $elems  = nqp::elems($input);
             $base = $base + $elems;
@@ -1328,7 +1332,7 @@ class ParaSeq does Sequence {
         my uint $base;  # base offset
 
         # Logic for queuing a buffer for .pairs
-        sub processor(uint $ordinal, $input is raw, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             my uint $elems  = nqp::elems($input);
             $base = $base + $elems;
@@ -1372,7 +1376,7 @@ class ParaSeq does Sequence {
         my $lock      := Lock.new;
 
         # Logic for queuing a buffer for unique WITH an infix op
-        sub processor(uint $ordinal, $input is raw, $semaphore) {
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
 
             $SCHEDULER.cue: {
                 my uint $then = nqp::time;
