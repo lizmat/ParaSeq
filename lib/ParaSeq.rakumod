@@ -443,13 +443,14 @@ class ParaSeq does Sequence {
     has           $!source;      # iterator producing source values
     has           $!result;      # iterator producing result values
     has           $!SCHEDULER;   # $*SCHEDULER to be used
+    has           $!snitcher;    # the snitcher to be called before/after
     has uint      $.batch;       # initial batch size, must be > 0
     has uint      $!auto;        # 1 if batch size automatically adjusts
     has uint      $.degree;      # number of CPUs, must be > 1
     has uint      $!stop-after;  # stop after these number of values
     has atomicint $!stop;        # stop all processing if 1
     has atomicint $.discarded;   # produced values discarded because of stop
- 
+
 #- private helper methods ------------------------------------------------------
 
     # Do error checking and set up object if all ok
@@ -475,9 +476,10 @@ class ParaSeq does Sequence {
         nqp::bindattr_i($self, ParaSeq, '$!degree',     $degree    );
         nqp::bindattr_i($self, ParaSeq, '$!stop-after', $stop-after);
 
-        nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $*SCHEDULER );
-        nqp::bindattr($self, ParaSeq, '$!buffer',    $buffer     );
-        nqp::bindattr($self, ParaSeq, '$!source',    $source     );
+        nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $*SCHEDULER);
+        nqp::bindattr($self, ParaSeq, '$!snitcher',  nqp::null  );
+        nqp::bindattr($self, ParaSeq, '$!buffer',    $buffer    );
+        nqp::bindattr($self, ParaSeq, '$!source',    $source    );
         $self
     }
 
@@ -522,15 +524,15 @@ class ParaSeq does Sequence {
             nqp::push($pressure,$batch) for ^$!degree;
         }
 
+        # Set up the result iterator
+        $!result := ParaIterator.new(
+          self, $pressure, $!batch, $!auto, $!stop-after
+        );
+
         # Queue the first buffer we already filled, and set up the
         # result iterator
-        processor(
-          0,
-          $first,
-          ($!result := ParaIterator.new(
-            self, $pressure, $!batch, $!auto, $!stop-after
-          )).semaphore
-        );
+        $!snitcher($first) unless nqp::isnull($!snitcher);
+        processor(0, $first, $!result.semaphore);
 
         # Make sure the scheduling of further batches actually happen in a
         # separate thread
@@ -539,8 +541,9 @@ class ParaSeq does Sequence {
             my uint $exhausted;  # flag: 1 if exhausted
 
             # some shortcuts
-            my $source := $!source;
-            my $result := $!result;
+            my $source   := $!source;
+            my $result   := $!result;
+            my $snitcher := $!snitcher;
 
             # Until we're halted or have a buffer that's not full
             nqp::until(
@@ -556,7 +559,13 @@ class ParaSeq does Sequence {
                 )),
                 nqp::if(         # add if something to add
                   nqp::elems($buffer) && nqp::not_i(nqp::atomicload_i($!stop)),
-                  processor(++$ordinal, $buffer, $result.semaphore);
+                  nqp::stmts(
+                    nqp::unless(
+                      nqp::isnull($snitcher),
+                      $snitcher($buffer.List)
+                    ),
+                    processor(++$ordinal, $buffer, $result.semaphore);
+                  )
                 )
               )
             );
@@ -576,8 +585,10 @@ class ParaSeq does Sequence {
         nqp::bindattr_i($self, ParaSeq, '$!batch',      $!batch     );
         nqp::bindattr_i($self, ParaSeq, '$!auto',       $!auto      );
         nqp::bindattr_i($self, ParaSeq, '$!stop-after', $!stop-after);
-        nqp::bindattr(  $self, ParaSeq, '$!SCHEDULER',  $!SCHEDULER );
-        nqp::bindattr(  $self, ParaSeq, '$!source',     source      );
+
+        nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $!SCHEDULER);
+        nqp::bindattr($self, ParaSeq, '$!snitcher',  nqp::null  );
+        nqp::bindattr($self, ParaSeq, '$!source',    source     );
         $self
     }
 
@@ -621,6 +632,13 @@ class ParaSeq does Sequence {
           ++$elems
         );
         $elems
+    }
+
+#- debugging -------------------------------------------------------------------
+
+    multi method snitch(ParaSeq:D: &snitcher = &note) {
+        $!snitcher := &snitcher;
+        self
     }
 
 #- entry points ----------------------------------------------------------------
@@ -1588,11 +1606,6 @@ class ParaSeq does Sequence {
     proto method snip(|) {*}
     multi method snip(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.snip(|c).iterator
-    }
-
-    proto method snitch(|) {*}
-    multi method snitch(ParaSeq:D: &snitcher = &note) {
-        self!pass-the-chain: self.Seq.snitch(&snitch).iterator
     }
 
     proto method sort(|) {*}

@@ -437,7 +437,13 @@ hypering logic has been added for this method.
 
 =head2 snitch
 
-L<C<.snitch>|https://docs.raku.org/type/Any#routine_snitch>
+B<Status>: since it doesn't make much sense for the
+L<C<.snitch>|https://docs.raku.org/type/Any#routine_snitch> method
+to be called on the C<ParaSeq> object as a whole, calling the
+C<.snitch> method instead acivates snitcher logic on the
+C<ParaSeq> object.  If set, the snitcher code will be called
+for each input buffer before being scheduled (in a threadsafe
+manner).  The snitcher code will receive this buffer as a C<List>.
 
 =head2 sort
 

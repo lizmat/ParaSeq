@@ -344,7 +344,7 @@ snip
 snitch
 ------
 
-[`.snitch`](https://docs.raku.org/type/Any#routine_snitch)
+**Status**: since it doesn't make much sense for the [`.snitch`](https://docs.raku.org/type/Any#routine_snitch) method to be called on the `ParaSeq` object as a whole, calling the `.snitch` method instead acivates snitcher logic on the `ParaSeq` object. If set, the snitcher code will be called for each input buffer before being scheduled (in a threadsafe manner). The snitcher code will receive this buffer as a `List`.
 
 sort
 ----
