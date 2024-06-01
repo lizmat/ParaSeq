@@ -327,6 +327,11 @@ slice
 
 **Status**: the nature of the [`.slice`](https://docs.raku.org/type/Seq#multi_method_slice) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
+snip
+----
+
+**Status**: the nature of the [`.snip`](https://docs.raku.org/type/Any#routine_snip) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+
 snitch
 ------
 
