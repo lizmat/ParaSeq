@@ -1564,6 +1564,14 @@ class ParaSeq does Sequence {
     }
 
     proto method skip(|) {*}
+    multi method skip(ParaSeq:D:) {
+        self.iterator.skip-one;
+        self
+    }
+    multi method skip(ParaSeq:D: Int(Cool) $what) {
+        self.iterator.skip-at-least($what);
+        self
+    }
     multi method skip(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.skip(|c).iterator
     }
