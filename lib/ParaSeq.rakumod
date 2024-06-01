@@ -454,7 +454,6 @@ class ParaSeq does Sequence {
 
     # Do error checking and set up object if all ok
     method !setup(
-       str $method,
       uint $batch,
       uint $auto,
       uint $degree,
@@ -462,10 +461,12 @@ class ParaSeq does Sequence {
            $buffer is raw,
            $source
     ) is hidden-from-backtrace {
-        X::Invalid::Value.new(:$method, :name<batch>,  :value($batch)).throw
-          if $batch <= 0;
-        X::Invalid::Value.new(:$method, :name<degree>, :value($degree)).throw
-          if $degree <= 1;
+        X::Invalid::Value.new(
+          :method<hyperize>, :name<batch>,  :value($batch)
+        ).throw if $batch <= 0;
+        X::Invalid::Value.new(
+          :method<hyperize>, :name<degree>, :value($degree)
+        ).throw if $degree <= 1;
 
         # Set it up!
         my $self := nqp::create(self);
@@ -632,8 +633,7 @@ class ParaSeq does Sequence {
       uint $initial,
       uint $auto,
       uint $degree,
-      uint $stop-after,
-      str  $method
+      uint $stop-after
     ) is implementation-detail {
         my $iterator := $source.iterator;
         my $buffer   := nqp::create(IB);
@@ -643,7 +643,7 @@ class ParaSeq does Sequence {
           ?? $buffer.Seq
           # Need to actually parallelize, set up ParaSeq object
           !! self!setup(
-               $method, $initial, $auto, $degree, $stop-after,
+               $initial, $auto, $degree, $stop-after,
                $buffer, $iterator
              )
     }
@@ -1677,7 +1677,6 @@ multi sub hyperize(
       $auto,
       ($degree // $default-degree).Int,
       $stop-after == Inf ?? 0 !! $stop-after,
-      'hyperize'
     )
 }
 multi sub hyperize(
@@ -1694,8 +1693,7 @@ multi sub hyperize(
            ($batch // $default-batch).Int,
            $auto,
            ($degree // $default-degree).Int,
-           $stop-after == Inf ?? 0 !! $stop-after,
-           'hyperize'
+           $stop-after == Inf ?? 0 !! $stop-after
          )
       !! $list
 }
