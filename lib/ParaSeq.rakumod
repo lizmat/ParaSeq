@@ -485,7 +485,7 @@ class ParaSeq does Sequence {
 
     # Start the async process with the given processor logic and the
     # required granularity for producing values
-    method !start(&processor, uint $granularity = 1) {
+    method !start(&processor, uint $granularity = 1, uint :$slow) {
 
         # Logic for making sure batch size has correct granularity
         my &granulize := $granularity == 1
@@ -529,21 +529,21 @@ class ParaSeq does Sequence {
           self, $pressure, $!batch, $!auto, $!stop-after
         );
 
-        # Queue the first buffer we already filled, and set up the
-        # result iterator
-        $!snitcher($first) unless nqp::isnull($!snitcher);
-        processor(0, $first, $!result.semaphore);
-
-        # Make sure the scheduling of further batches actually happen in a
-        # separate thread
-        $!SCHEDULER.cue: {
-            my uint $ordinal;    # ordinal number of batch
-            my uint $exhausted;  # flag: 1 if exhausted
-
-            # some shortcuts
+        # Batcher logic for fast batching, where no special phaser handling
+        # is required
+        sub fast() {
             my $source   := $!source;
             my $result   := $!result;
             my $snitcher := $!snitcher;
+
+            my uint $ordinal;    # ordinal number of batch
+            my uint $exhausted;  # flag: 1 if exhausted
+
+
+            # Queue the first buffer we already filled, and set up the
+            # result iterator
+            $snitcher($first) unless nqp::isnull($snitcher);
+            processor($ordinal, $first, $result.semaphore);
 
             # Until we're halted or have a buffer that's not full
             nqp::until(
@@ -573,6 +573,64 @@ class ParaSeq does Sequence {
             # No more result queues will come
             $result.close-queues
         }
+
+        # Batcher logic for slower batching, which tells each process unit
+        # whether or not it is the last batch, so that it can make sure the
+        # correct phasers are executed
+        sub slow() {
+            my $source   := $!source;
+            my $result   := $!result;
+            my $snitcher := $!snitcher;
+
+            my uint $ordinal; # ordinal number of batch
+            my uint $needed;  # number of values to still fetch
+
+            # flag: 1 if exhausted
+            my uint $exhausted =
+              nqp::eqaddr((my $initial := $source.pull-one),IE);
+
+            # Queue the first buffer we already filled, and set up the
+            # result iterator
+            $snitcher($first) unless nqp::isnull($snitcher);
+            processor($ordinal, $exhausted, $first, $result.semaphore);
+
+            # Until the source iterator is exhausted or we're halted
+            until $exhausted || nqp::atomicload_i($!stop) {
+                # Wait for ok to proceed
+                $needed = granulize(nqp::shift($pressure)) - 1;
+
+                # Setup buffer with initial value
+                nqp::push((my $buffer := nqp::create(IB)),$initial);
+
+                # Fetch any additional values needed and set flag
+                $exhausted =
+                  nqp::eqaddr($source.push-exactly($buffer,$needed),IE);
+
+                # If not already exhausted attempt to get one value more
+                $exhausted = nqp::eqaddr(($initial := $source.pull-one),IE)
+                  unless $exhausted;
+
+                # Process if there's something to process and not halted
+                if nqp::elems($buffer)
+                  && nqp::not_i(nqp::atomicload_i($!stop)) {
+
+                    # Snitch if so indicated
+                    $snitcher($buffer.List) unless nqp::isnull($snitcher);
+
+                    # Schedule the batch
+                    processor(
+                      ++$ordinal, $exhausted, $buffer, $result.semaphore
+                    );
+                }
+            }
+
+            # No more result queues will come
+            $result.close-queues
+        }
+
+        # Make sure the scheduling of further batches actually happen in a
+        # separate thread, whether they'd be slow or fast
+        $!SCHEDULER.cue: $slow ?? &slow !! &fast;
 
         # All scheduled now, so let the show begin!
         self
@@ -961,7 +1019,7 @@ class ParaSeq does Sequence {
         my uint $base;  # base offset for :k, :kv, :p
 
         # Logic for queuing a buffer for bare grep { }, producing values
-        sub v(uint $ordinal, $input is raw, $semaphore is raw) {
+        sub v(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
@@ -976,7 +1034,7 @@ class ParaSeq does Sequence {
         }
 
         # Logic for queuing a buffer for grep { } :k
-        sub k(uint $ordinal, $input is raw, $semaphore is raw) {
+        sub k(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
@@ -995,7 +1053,7 @@ class ParaSeq does Sequence {
         }
 
         # Logic for queuing a buffer for grep { } :kv
-        sub kv(uint $ordinal, $input is raw, $semaphore is raw) {
+        sub kv(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
@@ -1017,7 +1075,7 @@ class ParaSeq does Sequence {
         }
 
         # Logic for queuing a buffer for grep { } :p
-        sub p(uint $ordinal, $input is raw, $semaphore is raw) {
+        sub p(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
@@ -1041,7 +1099,8 @@ class ParaSeq does Sequence {
         # Let's go!
         self!start(
           $k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v,
-          granularity($matcher)
+          granularity($matcher),
+          :slow
         )
     }
 
@@ -1172,23 +1231,25 @@ class ParaSeq does Sequence {
 
         # Logic for queuing a buffer for map
         my $SCHEDULER := $!SCHEDULER;
-        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
+        sub processor(
+          uint $ordinal,
+          uint $last,
+               $input is raw,
+               $semaphore is raw,
+        ) {
             $SCHEDULER.cue: {
                 my uint $then    = nqp::time;
-                my      $output := nqp::create(IB);
 
-                my $iterator := $input.Seq.map($mapper).iterator;
-                nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
-                  nqp::push($output,$pulled)
+                $input.List.map($mapper).iterator.push-all(
+                  my $output := nqp::create(IB)
                 );
+
                 self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
 
         # Let's go!
-        self!start(&processor, granularity($mapper))
+        self!start(&processor, granularity($mapper), :slow)
     }
 
 #- max -------------------------------------------------------------------------
