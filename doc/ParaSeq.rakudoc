@@ -407,6 +407,20 @@ has been implemented for the single argument non-C<Pair> case.  All
 other cases are basically too complicated to hyper, and therefore
 have no specific hypering logic.
 
+=head2 skip
+
+B<Status>: the simple cases of C<.skip()> and C<.skip(N)> are
+handled by skipping that amount on the result iterator and returning
+the invocant.
+
+The case of C<.skip(*)> is handled by stopping any production of
+values and returning an empty C<Seq>.
+
+The nature of the other types of arguments on the
+L<C<.skip>|https://docs.raku.org/type/Seq#method_skip> method
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for these cases.
+
 =head2 slice
 
 B<Status>: the nature of the

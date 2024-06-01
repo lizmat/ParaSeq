@@ -1572,6 +1572,10 @@ class ParaSeq does Sequence {
         self.iterator.skip-at-least($what);
         self
     }
+    multi method skip(ParaSeq:D: Whatever) {
+        self.stop;
+        self!pass-the-chain: Rakudo::Iterator.Empty
+    }
     multi method skip(ParaSeq:D: |c) {
         self!pass-the-chain: self.Seq.skip(|c).iterator
     }

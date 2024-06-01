@@ -2,7 +2,7 @@ use v6.*;  # need v6.e semantics of .skip
 use Test;
 use ParaSeq;
 
-plan 16;
+plan 20;
 
 my constant $elems = 200000;
 my constant $batch = 16;
@@ -12,6 +12,7 @@ my constant $skip   = @list.skip.List;
 my constant $skip3  = @list.skip(3).List;
 my constant $skipw3 = @list.skip(*-3).List;
 my constant $skip34 = @list.skip(3,4).List;
+my constant $skipW  = @list.skip(*).List;
 
 for 1, ParaSeq.default-degree {
     my $seq := @list.&hyperize($batch, $_).skip;
@@ -29,6 +30,10 @@ for 1, ParaSeq.default-degree {
     $seq := @list.&hyperize($batch, $_).skip(3,4);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $skip34, "skip(3,4) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).skip(*);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $skipW, "skip(*) with degree = $_";
 }
 
 # vim: expandtab shiftwidth=4

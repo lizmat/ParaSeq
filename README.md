@@ -322,6 +322,15 @@ rotor
 
 **Status**: an optimized version of the [`.rotor`](https://docs.raku.org/type/List#routine_rotor) method has been implemented for the single argument non-`Pair` case. All other cases are basically too complicated to hyper, and therefore have no specific hypering logic.
 
+skip
+----
+
+**Status**: the simple cases of `.skip()` and `.skip(N)` are handled by skipping that amount on the result iterator and returning the invocant.
+
+The case of `.skip(*)` is handled by stopping any production of values and returning an empty `Seq`.
+
+The nature of the other types of arguments on the [`.skip`](https://docs.raku.org/type/Seq#method_skip) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for these cases.
+
 slice
 -----
 
