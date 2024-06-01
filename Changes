@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.0.8  2024-06-01T14:49:20+02:00
     - Added Theory of operation section in documentation
     - Updated status of ".sort" and added tests
     - Updated status of ".collate" and added tests
