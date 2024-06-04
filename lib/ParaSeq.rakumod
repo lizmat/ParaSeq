@@ -25,12 +25,129 @@ my constant IE = IterationEnd;
 my constant emptyIB   = nqp::create(IB);
 my constant emptyList = emptyIB.List;
 
-#- hidesFIRST ------------------------------------------------------------------
-# A role that will hide the FIRST phaser from being detected in .map,
-# allowing selected setting of the p6setfirstflag only on the first batch
-# of a .map operation
+#- BlockRunner -----------------------------------------------------------------
+# A role to give a Block extra capabilities, needed to be able to run
+# map / grep like parallel sequences
 
-my role hidesFIRST {
+my role BlockRunner {
+    has uint $!granularity;  # the granularity of the Block
+    has      $!FIRSTs;       # any FIRST phasers
+    has      $!NEXTs;        # any NEXT phasers
+    has      $!LASTs;        # any LAST phasers
+
+    # Set up the extra capabilities
+    method setup(uint $granularity) {
+        $!granularity = $granularity;
+        my $phasers  := nqp::getattr(self,Block,'$!phasers');
+
+        # If it is a single LEAVE phaser, we need to convert it to a
+        # multi phaser hash first
+        if nqp::isinvokable($phasers) {
+            my $LEAVE := nqp::create(IB);
+            nqp::push($LEAVE,$phasers);
+            $phasers := nqp::hash(
+              '!LEAVE-ORDER', $LEAVE, 'LEAVE', $LEAVE
+            );
+        }
+
+        # Make sure we're going to do all stuff on a clone
+        elsif $phasers {
+            $phasers := nqp::clone($phasers);
+        }
+
+        # Otherwise set up a clean slate
+        else {
+            $phasers := nqp::hash;
+        }
+
+        # Save any FIRST phasers and remove them.  NOTE: this currently
+        # only serves as a flag, as the FIRST phasers are actually
+        # embedded into the code block itself.  But this may change
+        # with RakuAST.
+        nqp::deletekey($phasers,"FIRST")
+          if $!FIRSTs := self.callable_for_phaser("FIRST");
+    
+        # Save any NEXT phasers and remove them
+        nqp::deletekey($phasers,"NEXT")
+          if $!NEXTs := self.callable_for_phaser("NEXT");
+
+        # Save any LAST phasers and remove them
+        nqp::deletekey($phasers,"LAST")
+          if $!LASTs := self.callable_for_phaser("LAST");
+
+        # These are the phasers for now
+        nqp::bindattr(self,Block,'$!phasers',$phasers);
+
+        # Return invocant for convenience
+        self
+    }
+
+    # The actual running logi, which makes sure that any FIRST / LAST phasers
+    # are only run once, and any "last" in the block is also handled as
+    # expected
+    method run(
+      uint $first,             # is this the first batch
+      uint $last,              # is this the last batch
+      str  $method,            # method to be executed
+           $input     is raw,  # the IterationBuffer to work on
+           $result    is raw,  # the result iterator
+           $semaphore is raw   # the semaphore to which result will be pushed
+    ) {
+        # Make sure we have our own mapper / phasers
+        my $this-mapper  := nqp::clone(self);
+        my $this-phasers := nqp::clone(nqp::getattr(self,Block,'$!phasers'));
+        nqp::bindattr($this-mapper,Block,'$!phasers',$this-phasers);
+
+        # logic for setting a phaser for this run
+        sub set-phaser(str $name, Callable:D $phaser) {
+            nqp::push((my $buffer := nqp::create(IB)),$phaser);
+            nqp::bindkey($this-phasers,$name,$buffer);
+        }
+
+        # Set the FIRST flag on the first batch only
+        if $first && $!FIRSTs {
+            # Actually make FIRST phaser getting ran (legacy)
+            nqp::p6setfirstflag(
+              nqp::getattr($this-mapper,Code,'$!do')
+            );
+            set-phaser("FIRST", $!FIRSTs);
+        }
+
+        # Keep counter to see whether all input values have been
+        # processed: if $todo > 0 at the end, a "last" was
+        # executed in the mapper
+        my uint $todo        = nqp::elems($input);
+        my uint $granularity = $!granularity;
+        set-phaser("NEXT", $!NEXTs
+          ?? { $todo = $todo - $granularity; $!NEXTs() }
+          !! { $todo = $todo - $granularity           }
+        );
+
+        # Set LAST phaser, to actually execute if it's the last
+        # batch, or a "last" got executed
+        set-phaser("LAST", {
+            if ($last || $todo) && $!LASTs {
+                $!LASTs();
+                $!LASTs := Mu;  # make sure we only call LAST once
+            }
+        }) if $!LASTs;
+
+        # Actually run the method with all the named arguments
+        $input.List."$method"($this-mapper, |%_).iterator.push-all(
+          my $output := nqp::create(IB)
+        );
+
+        # Mark this semaphore as the last to be handled if a
+        # "last" was executed
+        $result.set-lastsema($semaphore) if $todo;
+
+        # Return the result
+        $output
+    }
+
+    # Fool the core's mapper into thinking that this block does not actually
+    # have FIRST phaser, which stops it from setting the first flag (on
+    # Rakudo 2024.06+)
     multi method has-phaser("FIRST" --> False) { }
     multi method has-phaser(Str:D) { nextsame }
 }
@@ -1247,50 +1364,13 @@ class ParaSeq does Sequence {
 #- map -------------------------------------------------------------------------
 
     multi method map(ParaSeq:D: Callable:D $Mapper) {
-        my $SCHEDULER := $!SCHEDULER;
+        my      $SCHEDULER  := $!SCHEDULER;
         my uint $granularity = granularity($Mapper);
 
         # If we can have phasers, we need to handle them
         if nqp::istype($Mapper,Block) {
-
-            # Initial phase of the phasers hash
-            my $mapper  := $Mapper but hidesFIRST;
-            my $phasers := nqp::getattr($mapper,Block,'$!phasers');
-
-            # If it is a single LEAVE phaser, we need to convert it to a
-            # multi phaser hash first
-            if nqp::isinvokable($phasers) {
-                my $LEAVE := nqp::create(IB);
-                nqp::push($LEAVE,$phasers);
-                $phasers := nqp::hash(
-                  '!LEAVE-ORDER', $LEAVE, 'LEAVE', $LEAVE
-                );
-            }
-
-            # Make sure we're going to do all stuff on a clone
-            elsif $phasers {
-                $phasers := nqp::clone($phasers);
-            }
-
-            # Otherwise set up a clean slate
-            else {
-                $phasers := nqp::hash;
-            }
-
-            # Save any FIRST phasers and remove them.  NOTE: this currently
-            # only serves as a flag, as the FIRST phasers are actually
-            # embedded into the code block itself.  But this may change
-            # with RakuAST.
-            nqp::deletekey($phasers,"FIRST")
-              if my $FIRSTs := $mapper.callable_for_phaser("FIRST");
-
-            # Save any NEXT phasers and remove them
-            nqp::deletekey($phasers,"NEXT")
-              if my $NEXTs := $mapper.callable_for_phaser("NEXT");
-
-            # Save any LAST phasers and remove them
-            nqp::deletekey($phasers,"LAST")
-              if my $LASTs := $mapper.callable_for_phaser("LAST");
+            my $mapper :=
+              (nqp::clone($Mapper) but BlockRunner).setup($granularity);
 
             # Logic for queuing a buffer for map
             sub processor (
@@ -1302,55 +1382,12 @@ class ParaSeq does Sequence {
                 $SCHEDULER.cue: {
                     my uint $then = nqp::time;
 
-                    # Make sure we have our own mapper / phasers
-                    my $this-mapper  := nqp::clone($mapper);
-                    my $this-phasers := nqp::clone($phasers);
-                    nqp::bindattr($this-mapper,Block,'$!phasers',$this-phasers);
-
-                    # logic for setting a phaser for this run
-                    sub set-phaser(str $name, Callable:D $phaser) {
-                        nqp::push((my $buffer := nqp::create(IB)),$phaser);
-                        nqp::bindkey($this-phasers,$name,$buffer);
-                    }
-
-                    # Set the FIRST flag on the first batch only
-                    if $ordinal == 0 && $FIRSTs {
-                        # Actually make FIRST phaser getting ran (legacy)
-                        nqp::p6setfirstflag(
-                          nqp::getattr($this-mapper,Code,'$!do')
-                        );
-                        set-phaser("FIRST", $FIRSTs);
-                    }
-
-                    # Keep counter to see whether all input values have been
-                    # processed: if $todo > 0 at the end, a "last" was
-                    # executed in the mapper
-                    my uint $todo = nqp::elems($input);
-                    set-phaser("NEXT", $NEXTs
-                      ?? { $todo = $todo - $granularity; $NEXTs() }
-                      !! { $todo = $todo - $granularity           }
-                    );
-
-                    # Set LAST phaser, to actually execute if it's the last
-                    # batch, or a "last" got executed
-                    set-phaser("LAST", {
-                        if ($last || $todo) && $LASTs {
-                            $LASTs();
-                            $LASTs := Mu;  # make sure we only call LAST once
-                        }
-                    }) if $LASTs;
-
-                    # Actually do the mapping
-                    $input.List.map($this-mapper).iterator.push-all(
-                      my $output := nqp::create(IB)
-                    );
-
-                    # Mark this semaphore as the last to be handled if a
-                    # "last" was executed
-                    $!result.set-lastsema($semaphore) if $todo;
-
                     self!batch-done(
-                      $ordinal, $then, $input, $semaphore, $output
+                      $ordinal, $then, $input, $semaphore,
+                      $mapper.run(
+                        $ordinal == 0, $last,
+                        'map', $input, $!result, $semaphore
+                      )
                     );
                 }
             }
