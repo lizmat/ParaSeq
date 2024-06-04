@@ -1,15 +1,40 @@
 use Test;
 use ParaSeq;
 
-plan 12;
+plan 38;
 
 my constant $elems = 200000;
 my constant $batch = 16;
 
+# Simple mapping
 my constant @list   = (^$elems).reverse.List;
 my constant $map2   = @list.map(* * 2).List;
 my constant $mapm2  = @list.map(-> $a, $b          { $a }).List;
 my constant $mapm4  = @list.map(-> $a, $b, $c, $d  { $a }).List;
+
+# Blocks with a "last" in them
+my constant $lafter   = 12345;
+my constant $mapper2  = { last if $_ == $lafter; $_ * 2 }
+my constant $last2    = @list.map($mapper2).List;
+my constant $mapperm2 = -> $a, $b { last if $a >= $lafter; $a }
+my constant $lastm2   = @list.map($mapperm2).List;
+my constant $mapperm4 = -> $a, $b, $c, $d  { last if $a >= $lafter; $a }
+my constant $lastm4   = @list.map($mapperm4).List;
+
+# Block with phasers in them
+my atomicint $FIRSTseen;
+my atomicint $ENTERseen;
+my atomicint $LEAVEseen;
+my atomicint $NEXTseen;
+my atomicint $LASTseen;
+my $phasers = {
+    FIRST $FIRSTseen⚛++;
+    ENTER $ENTERseen⚛++;
+    LEAVE $LEAVEseen⚛++;
+    NEXT  $NEXTseen⚛++;
+    LAST  $LASTseen⚛++;
+    $_ * 2
+}
 
 for 1, ParaSeq.default-degree {
     my $seq := @list.&hyperize($batch, $_).map(* * 2);
@@ -25,6 +50,40 @@ for 1, ParaSeq.default-degree {
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $mapm4,
       "map(-> \$a, \$b, \$c, \$d \{ \$a }) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).map($mapper2);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $last2,
+      "map(\{ last if \$_ == $lafter; \$_ * 2 }) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).map($mapperm2);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $lastm2,
+      "map(-> \$a, \$b \{ last if \$a >= $lafter; \$a }) with degree = $_";
+
+    $seq := @list.&hyperize($batch, $_).map($mapperm4);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $lastm4,
+      "map(-> \$a, \$b, \$c, \$d \{ last if \$a >= $lafter; \$a }) with degree = $_";
+
+    $FIRSTseen = $ENTERseen = $NEXTseen = $LEAVEseen = $LASTseen = 0;
+    $seq := @list.&hyperize($batch, $_).map($phasers);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $map2,
+      "map(\{ PHASERS; \$_ * 2 }) with degree = $_";
+
+    todo("FIRST flag executed for each batch until 2024.06")
+      unless $_ == 1;
+    is $FIRSTseen, 1,
+      "FIRST phaser fired only once with degree $_";
+    is $ENTERseen, $elems,
+      "ENTER phaser fired for each iteration with degree $_";
+    is $NEXTseen,  $elems,
+      "NEXT phaser fired for each iteration with degree $_";
+    is $LEAVEseen, $elems,
+      "LEAVE phaser fired for each iteration with degree $_";
+    is $LASTseen,  1,
+      "LAST phaser fired only once with degree $_";
 }
 
 # vim: expandtab shiftwidth=4

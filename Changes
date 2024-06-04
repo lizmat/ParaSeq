@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+    - Updated status of ".map", added support for
+      phasers and added many more tests
 
 0.0.8  2024-06-01T14:49:20+02:00
     - Added Theory of operation section in documentation

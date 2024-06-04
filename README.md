@@ -245,7 +245,15 @@ kv
 map
 ---
 
-[`.map`](https://docs.raku.org/type/List#routine_map)
+**Status**: an optimized version of the [`.map`](https://docs.raku.org/type/List#routine_map) method has been implemented.
+
+**Caveat**: due to a bug in Rakudo until 2024.06 release, any `FIRST` phaser will be run at the start of each batch. This can be worked around by using the [**$**, the nameless state variable](https://docs.raku.org/language/variables#The_$_variable):
+
+```raku
+@am.&hyperize.map({ FIRST say "first" unless $++; 42 });
+```
+
+**Caveat**: if a `last` statement is executed, it will ensure that no further values will be delivered. However, this may not stop other threads immediately. So any other phasers, such as `ENTER`, `LEAVE` and `NEXT` may still get executed, even though the values that were produced, will not be delivered.
 
 max
 ---

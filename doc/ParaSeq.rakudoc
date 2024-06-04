@@ -310,7 +310,26 @@ implemented.
 
 =head2 map
 
-L<C<.map>|https://docs.raku.org/type/List#routine_map>
+B<Status>: an optimized version of the
+L<C<.map>|https://docs.raku.org/type/List#routine_map> method has been
+implemented.
+
+B<Caveat>: due to a bug in Rakudo until 2024.06 release, any C<FIRST>
+phaser will be run at the start of each batch.  This can be worked
+around by using the
+L<B<$>, the nameless state variable|https://docs.raku.org/language/variables#The_$_variable>:
+
+=begin code :lang<raku>
+
+@am.&hyperize.map({ FIRST say "first" unless $++; 42 });
+
+=end code
+
+B<Caveat>: if a C<last> statement is executed, it will ensure that
+no further values will be delivered.  However, this may not stop
+other threads immediately.  So any other phasers, such as C<ENTER>,
+C<LEAVE> and C<NEXT> may still get executed, even though the values
+that were produced, will not be delivered.
 
 =head2 max
 
