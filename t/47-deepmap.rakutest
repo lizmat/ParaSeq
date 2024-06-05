@@ -3,7 +3,7 @@ use ParaSeq;
 
 plan 16;
 
-my constant $elems    = 12000;
+my constant $elems    = 200000;
 my constant $expected = $elems * 1.4;
 my constant $batch    = 16;
 
@@ -12,7 +12,7 @@ my constant @list   = (^$elems).map({ $_ %% 5 ?? ($_,$_+1,$_+2) !! $_}).List;
 my constant $map2   = @list.deepmap(* * 2).List;
 
 # Blocks with a "last" in them
-my constant $lafter   = 12345;
+my constant $lafter   = 23456;
 my constant $mapper2  = { last if $_ == $lafter; $_ * 2 }
 my constant $last2    = @list.deepmap($mapper2).List;
 
@@ -25,28 +25,28 @@ my $phasers = {
     $_ * 2
 }
 
-for 1, ParaSeq.default-degree {
-    my $seq := @list.&hyperize($batch, $_).deepmap(* * 2);
-    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
-    is-deeply $seq.List, $map2, "map(* %% 2) with degree = $_";
+for 1, ParaSeq.default-degree -> $degree {
+    my $seq := @list.&hyperize($batch, $degree).deepmap(* * 2);
+    isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $map2, "map(* %% 2) with degree = $degree";
 
-    $seq := @list.&hyperize($batch, $_).deepmap($mapper2);
-    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    $seq := @list.&hyperize($batch, $degree).deepmap($mapper2);
+    isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
     is-deeply $seq.List, $last2,
-      "map(\{ last if \$_ == $lafter; \$_ * 2 }) with degree = $_";
+      "map(\{ last if \$_ == $lafter; \$_ * 2 }) with degree = $degree";
 
     $ENTERseen = $LEAVEseen = 0;
-    $seq := @list.&hyperize($batch, $_).deepmap($phasers);
-    isa-ok $seq, $_ == 1 ?? List !! ParaSeq;
+    $seq := @list.&hyperize($batch, $degree).deepmap($phasers);
+    isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
     is-deeply $seq.List, $map2,
-      "map(\{ PHASERS; \$_ * 2 }) with degree = $_";
+      "map(\{ PHASERS; \$_ * 2 }) with degree = $degree";
 
     todo("FIRST flag executed for each batch until 2024.06")
-      unless $_ == 1;
+      unless $degree == 1;
     is $ENTERseen, $expected,
-      "ENTER phaser fired for each iteration with degree $_";
+      "ENTER phaser fired for each iteration with degree $degree";
     is $LEAVEseen, $expected,
-      "LEAVE phaser fired for each iteration with degree $_";
+      "LEAVE phaser fired for each iteration with degree $degree";
 }
 
 # vim: expandtab shiftwidth=4

@@ -129,7 +129,7 @@ my role BlockRunner {
                 $!LASTs();
                 $!LASTs := Mu;  # make sure we only call LAST once
             }
-        });
+        }) if $!LASTs;
 
         # Actually run the method with all the named arguments
         $input.List."$method"($this-mapper, |%_).iterator.push-all(
