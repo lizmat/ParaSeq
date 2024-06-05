@@ -134,7 +134,7 @@ my role BlockRunner {
         # Set LAST phaser, to actually execute if it's the last
         # batch, or a "last" got executed
         set-phaser("LAST", {
-            if ($last || $todo) && $!LASTs {
+            if ($last || $todo > 0) && $!LASTs {
                 $!LASTs();
                 $!LASTs := Mu;  # make sure we only call LAST once
             }
@@ -147,7 +147,7 @@ my role BlockRunner {
 
         # Mark this semaphore as the last to be handled if a
         # "last" was executed
-        $result.set-lastsema($semaphore) if $todo;
+        $result.set-lastsema($semaphore) if $todo > 0;
 
         # Return the result
         $output
