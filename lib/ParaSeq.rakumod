@@ -29,14 +29,14 @@ my constant emptyList = emptyIB.List;
 
 # A very hacky way to catch the excution of "last".  This requires the
 # the scope of the mapper to be within the scope where the ParaSeq module
-# is imported to
-my proto sub last(|) is export {*}
-my multi sub last() {
+# is imported to, or any other code should call it with ParaSeq::last
+proto sub last(|) is export {*}
+multi sub last() {
     my $LAST := $*LAST;
     $LAST = 1 unless nqp::istype($LAST,Failure);
     &CORE::last()
 }
-my multi sub last(Mu $value) {
+multi sub last(Mu $value) {
     my $LAST := $*LAST;
     $LAST = 1 unless nqp::istype($LAST,Failure);
     &CORE::last($value)
