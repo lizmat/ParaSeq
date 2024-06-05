@@ -1150,7 +1150,8 @@ class ParaSeq does Sequence {
 
 #- grep ------------------------------------------------------------------------
 
-    multi method grep(ParaSeq:D: Callable:D $matcher, :$k, :$kv, :$p) {
+    # Handling Callables that can have phasers
+    multi method grep(ParaSeq:D: Block:D $matcher, :$k, :$kv, :$p) {
         my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset for :k, :kv, :p
 
@@ -1159,12 +1160,9 @@ class ParaSeq does Sequence {
             $SCHEDULER.cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
-                my $iterator := $input.Seq.grep($matcher).iterator;
-                nqp::until(
-                  nqp::eqaddr((my $pulled := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
-                  nqp::push($output,$pulled)
-                );
+
+                $input.Seq.grep($matcher).iterator.push-all($output);
+
                 self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
@@ -1180,8 +1178,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :k).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
                   nqp::push($output,$offset + $key)
                 );
                 self!batch-done($ordinal, $then, $input, $semaphore, $output);
@@ -1199,8 +1196,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
                   nqp::stmts(
                     nqp::push($output,$offset + $key),     # key
                     nqp::push($output,$iterator.pull-one)  # value
@@ -1221,8 +1217,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
                   nqp::push(
                     $output,
                     Pair.new($offset + $key, $iterator.pull-one)
@@ -1240,6 +1235,92 @@ class ParaSeq does Sequence {
         )
     }
 
+    # Handling other Callables that cannot have phasers
+    multi method grep(ParaSeq:D: Callable:D $matcher, :$k, :$kv, :$p) {
+        my $SCHEDULER := $!SCHEDULER;
+        my uint $base;  # base offset for :k, :kv, :p
+
+        # Logic for queuing a buffer for bare grep { }, producing values
+        sub v(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                $input.Seq.grep($matcher).iterator.push-all($output);
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Logic for queuing a buffer for grep { } :k
+        sub k(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
+            my uint $offset = $base;
+            $base = $base + nqp::elems($input);
+
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                my $iterator := $input.Seq.grep($matcher, :k).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
+                  nqp::push($output,$offset + $key)
+                );
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Logic for queuing a buffer for grep { } :kv
+        sub kv(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
+            my uint $offset = $base;
+            $base = $base + nqp::elems($input);
+
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                my $iterator := $input.Seq.grep($matcher, :kv).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
+                  nqp::stmts(
+                    nqp::push($output,$offset + $key),     # key
+                    nqp::push($output,$iterator.pull-one)  # value
+                  )
+                );
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Logic for queuing a buffer for grep { } :p
+        sub p(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
+            my uint $offset = $base;
+            $base = $base + nqp::elems($input);
+
+            $SCHEDULER.cue: {
+                my uint $then    = nqp::time;
+                my      $output := nqp::create(IB);
+
+                my $iterator := $input.Seq.grep($matcher, :kv).iterator;
+                nqp::until(
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
+                  nqp::push(
+                    $output,
+                    Pair.new($offset + $key, $iterator.pull-one)
+                  )
+                );
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+            }
+        }
+
+        # Let's go!
+        self!start(
+          $k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v,
+          granularity($matcher),
+          :slow
+        )
+    }
+
+    # Handling smart-matchinng logic
     multi method grep(ParaSeq:D: $matcher, :$k, :$kv, :$p) {
         my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset for :k, :kv, :p
@@ -1250,12 +1331,8 @@ class ParaSeq does Sequence {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
-                my $iterator := $input.Seq.grep($matcher).iterator;
-                nqp::until(
-                  nqp::eqaddr((my $value := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
-                  nqp::push($output,$value)
-                );
+                $input.Seq.grep($matcher).iterator.push-all($output);
+
                 self!batch-done($ordinal, $then, $input, $semaphore, $output);
             }
         }
@@ -1271,8 +1348,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :k).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
                   nqp::push($output,$offset + $key)
                 );
                 self!batch-done($ordinal, $then, $input, $semaphore, $output);
@@ -1290,8 +1366,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
                   nqp::stmts(
                     nqp::push($output,$offset + $key),     # key
                     nqp::push($output,$iterator.pull-one)  # value
@@ -1312,8 +1387,7 @@ class ParaSeq does Sequence {
 
                 my $iterator := $input.Seq.grep($matcher, :kv).iterator;
                 nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IE)
-                    || nqp::atomicload_i($!stop),
+                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
                   nqp::push(
                     $output,
                     Pair.new($offset + $key, $iterator.pull-one)
