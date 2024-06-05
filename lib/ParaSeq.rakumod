@@ -1437,59 +1437,55 @@ class ParaSeq does Sequence {
 
 #- map -------------------------------------------------------------------------
 
-    multi method map(ParaSeq:D: Callable:D $Mapper) {
+    # Handling Callables that can have phasers
+    multi method map(ParaSeq:D: Block:D $Mapper) {
         my      $SCHEDULER  := $!SCHEDULER;
         my uint $granularity = granularity($Mapper);
 
-        # If we can have phasers, we need to handle them
-        if nqp::istype($Mapper,Block) {
-            my $mapper :=
-              (nqp::clone($Mapper) but BlockRunner).setup($granularity);
+        my $mapper := (nqp::clone($Mapper) but BlockRunner).setup($granularity);
 
-            # Logic for queuing a buffer for map
-            sub processor (
-              uint $ordinal,
-              uint $last,
-                   $input     is raw,
-                   $semaphore is raw,
-            ) {
-                $SCHEDULER.cue: {
-                    my uint $then = nqp::time;
+        # Logic for queuing a buffer for map
+        sub processor (
+          uint $ordinal,
+          uint $last,
+               $input     is raw,
+               $semaphore is raw,
+        ) {
+            $SCHEDULER.cue: {
+                my uint $then = nqp::time;
 
-                    self!batch-done(
-                      $ordinal, $then, $input, $semaphore,
-                      $mapper.run(
-                        $ordinal == 0, $last,
-                        'map', $input, $!result, $semaphore
-                      )
-                    );
-                }
+                self!batch-done(
+                  $ordinal, $then, $input, $semaphore,
+                  $mapper.run(
+                    $ordinal == 0, $last,
+                    'map', $input, $!result, $semaphore
+                  )
+                );
             }
-
-            # Let's go using the slower path
-            self!start(&processor, $granularity, :slow)
         }
 
-        # Callable without phasers, use the simple fast path
-        else {
-            sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
-                $SCHEDULER.cue: {
-                     my uint $then    = nqp::time;
-     
-                    $input.List.map($Mapper).iterator.push-all(
-                      my $output := nqp::create(IB)
-                    );
+        # Let's go using the slower path
+        self!start(&processor, $granularity, :slow)
+    }
 
-                    self!batch-done(
-                      $ordinal, $then, $input, $semaphore, $output
-                    );
-                 }
-         
-            }
+    # Handling Callables that cannot have phasers
+    multi method map(ParaSeq:D: Callable:D $mapper) {
+        my $SCHEDULER  := $!SCHEDULER;
 
-            # Let's go!
-            self!start(&processor, $granularity)
+        sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
+            $SCHEDULER.cue: {
+                 my uint $then    = nqp::time;
+
+                $input.List.map($mapper).iterator.push-all(
+                  my $output := nqp::create(IB)
+                );
+
+                self!batch-done($ordinal, $then, $input, $semaphore, $output);
+             }
         }
+
+        # Let's go!
+        self!start(&processor, granularity($mapper))
     }
 
 #- max -------------------------------------------------------------------------
