@@ -35,7 +35,7 @@ my role BlockRunner {
     has      $!LASTs;        # any LAST phasers
 
     # Set up the extra capabilities
-    method setup(uint $granularity) {
+    method setup(uint $granularity, :$no-first, :$no-last) {
         $!granularity = $granularity;
         my $phasers  := nqp::getattr(self,Block,'$!phasers');
 
@@ -65,10 +65,12 @@ my role BlockRunner {
         # with RakuAST.
         nqp::deletekey($phasers,"FIRST")
           if $!FIRSTs := self.callable_for_phaser("FIRST");
+        $!FIRSTs := Mu if $no-first;
 
         # Save any LAST phasers and remove them
         nqp::deletekey($phasers,"LAST")
           if $!LASTs := self.callable_for_phaser("LAST");
+        $!LASTs := Mu if $no-last;
 
         # These are the phasers for now
         nqp::bindattr(self,Block,'$!phasers',$phasers);
@@ -1162,6 +1164,22 @@ class ParaSeq does Sequence {
     multi method batch(ParaSeq:D: Int:D :$elems!) { self!batch($elems,1) }
     multi method batch(ParaSeq:D: Int:D  $elems ) { self!batch($elems,1) }
 
+#- deepmap ---------------------------------------------------------------------
+
+    multi method deepmap(ParaSeq:D: Block:D $mapper) {
+        my str @phasers;
+        nqp::push(@phasers,$_) if $mapper.has-phaser($_) for <FIRST NEXT LAST>;
+        warn "@phasers.join(", ") phaser(s) will be ignored" if @phasers;
+
+        my uint $granularity = granularity($mapper);
+        $granularity == 1
+          ?? self!mapBlock($mapper, 'deepmap', :no-first, :no-last)
+          !! die "Can only handle blocks with one parameter, got $granularity"
+    }
+    multi method deepmap(ParaSeq:D: Callable:D $mapper) {
+        self!mapCallable($mapper, 'deepmap')
+    }
+
 #- grep ------------------------------------------------------------------------
 
     # Handling Callables that can have phasers
@@ -1456,7 +1474,8 @@ class ParaSeq does Sequence {
         my      $SCHEDULER  := $!SCHEDULER;
         my uint $granularity = granularity($Mapper);
 
-        my $mapper := (nqp::clone($Mapper) but BlockRunner).setup($granularity);
+        my $mapper := (nqp::clone($Mapper) but BlockRunner)
+          .setup($granularity, |%_);
 
         sub processor (
           uint $ordinal,
@@ -1821,10 +1840,6 @@ class ParaSeq does Sequence {
     }
     multi method combinations(ParaSeq:D: $of) {
         self!pass-the-chain: self.List.combinations($of).iterator
-    }
-
-    multi method deepmap(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.deepmap(|c).iterator
     }
 
     multi method duckmap(ParaSeq:D: |c) {
