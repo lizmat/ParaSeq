@@ -106,9 +106,17 @@ my role BlockRunner {
 
         # Set the FIRST flag on the first batch only
         if $first && $!FIRSTs {
-            # Actually make FIRST phaser getting ran (legacy)
+
+            # Actually make FIRST phaser getting ran (legacy).  Need to
+            # create a clone of the code, as otherwise a second thread
+            # *may* be running the block with the first flag still set
+            # and thus cause the FIRST phaser to be executed (in the
+            # legacy runtime)
             nqp::p6setfirstflag(
-              nqp::getattr($this-mapper,Code,'$!do')
+              nqp::bindattr(
+                $this-mapper,Code,'$!do',
+                nqp::clone(nqp::getattr($this-mapper,Code,'$!do'))
+              )
             );
             set-phaser("FIRST", $!FIRSTs);
         }
