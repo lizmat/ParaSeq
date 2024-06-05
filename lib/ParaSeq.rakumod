@@ -27,21 +27,6 @@ my constant emptyList = emptyIB.List;
 
 #- BlockRunner -----------------------------------------------------------------
 
-# A very hacky way to catch the excution of "last".  This requires the
-# the scope of the mapper to be within the scope where the ParaSeq module
-# is imported to, or any other code should call it with ParaSeq::last
-proto sub last(|) is export {*}
-multi sub last() {
-    my $LAST := $*LAST;
-    $LAST = 1 unless nqp::istype($LAST,Failure);
-    &CORE::last()
-}
-multi sub last(Mu $value) {
-    my $LAST := $*LAST;
-    $LAST = 1 unless nqp::istype($LAST,Failure);
-    &CORE::last($value)
-}
-
 # A role to give a Block extra capabilities, needed to be able to run
 # map / grep like parallel sequences
 my role BlockRunner {
@@ -598,6 +583,23 @@ class ParaSeq does Sequence {
     has uint      $!stop-after;  # stop after these number of values
     has atomicint $!stop;        # stop all processing if 1
     has atomicint $.discarded;   # produced values discarded because of stop
+
+#- "last" handling -------------------------------------------------------------
+
+    # A very hacky way to catch the excution of "last".  This requires the
+    # the scope of the mapper to be within the scope where the ParaSeq module
+    # is imported to, or any other code should call it with ParaSeq::last
+    our proto sub last(|) is export {*}
+    multi sub last() {
+        my $LAST := $*LAST;
+        $LAST = 1 unless nqp::istype($LAST,Failure);
+        &CORE::last()
+    }
+    multi sub last(Mu $value) {
+        my $LAST := $*LAST;
+        $LAST = 1 unless nqp::istype($LAST,Failure);
+        &CORE::last($value)
+    }
 
 #- private helper methods ------------------------------------------------------
 
