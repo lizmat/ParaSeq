@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+    - Re-imagine the handling of "last", by exporting a "last"
+      subroutine.  Added Caveat as to the limitations this brings.
 
 0.0.9  2024-06-04T14:40:13+02:00
     - Updated status of ".map", added support for

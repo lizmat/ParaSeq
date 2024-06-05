@@ -331,6 +331,13 @@ other threads immediately.  So any other phasers, such as C<ENTER>,
 C<LEAVE> and C<NEXT> may still get executed, even though the values
 that were produced, will not be delivered.
 
+B<Caveat>: to catch any execution of C<last>, the C<ParaSeq> module
+exports its own C<last> subroutine.  This means that any mapper code
+will either have to live within the scope in which the C<use ParaSeq>
+command is executed, B<or> will need to call the fully qualified
+C<ParaSeq::last> subroutine to ensure proper C<last> handling in
+a hypered C<.map>.
+
 =head2 max
 
 B<Status>: an optimized version of the

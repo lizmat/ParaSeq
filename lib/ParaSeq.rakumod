@@ -26,13 +26,27 @@ my constant emptyIB   = nqp::create(IB);
 my constant emptyList = emptyIB.List;
 
 #- BlockRunner -----------------------------------------------------------------
+
+# A very hacky way to catch the excution of "last".  This requires the
+# the scope of the mapper to be within the scope where the ParaSeq module
+# is imported to
+my proto sub last(|) is export {*}
+my multi sub last() {
+    my $LAST := $*LAST;
+    $LAST = 1 unless nqp::istype($LAST,Failure);
+    &CORE::last()
+}
+my multi sub last(Mu $value) {
+    my $LAST := $*LAST;
+    $LAST = 1 unless nqp::istype($LAST,Failure);
+    &CORE::last($value)
+}
+
 # A role to give a Block extra capabilities, needed to be able to run
 # map / grep like parallel sequences
-
 my role BlockRunner {
     has uint $!granularity;  # the granularity of the Block
     has      $!FIRSTs;       # any FIRST phasers
-    has      $!NEXTs;        # any NEXT phasers
     has      $!LASTs;        # any LAST phasers
 
     # Set up the extra capabilities
@@ -66,10 +80,6 @@ my role BlockRunner {
         # with RakuAST.
         nqp::deletekey($phasers,"FIRST")
           if $!FIRSTs := self.callable_for_phaser("FIRST");
-    
-        # Save any NEXT phasers and remove them
-        nqp::deletekey($phasers,"NEXT")
-          if $!NEXTs := self.callable_for_phaser("NEXT");
 
         # Save any LAST phasers and remove them
         nqp::deletekey($phasers,"LAST")
@@ -121,24 +131,18 @@ my role BlockRunner {
             set-phaser("FIRST", $!FIRSTs);
         }
 
-        # Keep counter to see whether all input values have been
-        # processed: if $todo > 0 at the end, a "last" was
-        # executed in the mapper
-        my uint $todo        = nqp::elems($input);
-        my uint $granularity = $!granularity;
-        set-phaser("NEXT", $!NEXTs
-          ?? { $todo = $todo - $granularity; $!NEXTs() }
-          !! { $todo = $todo - $granularity           }
-        );
+        # This will become 1 if a "last" was executed
+        my $*LAST;
 
         # Set LAST phaser, to actually execute if it's the last
-        # batch, or a "last" got executed
+        # batch, or a "last" got executed, as long as there was
+        # no other thread having executed it
         set-phaser("LAST", {
-            if ($last || $todo > 0) && $!LASTs {
+            if ($last || $*LAST) && $!LASTs {
                 $!LASTs();
                 $!LASTs := Mu;  # make sure we only call LAST once
             }
-        }) if $!LASTs;
+        });
 
         # Actually run the method with all the named arguments
         $input.List."$method"($this-mapper, |%_).iterator.push-all(
@@ -147,7 +151,7 @@ my role BlockRunner {
 
         # Mark this semaphore as the last to be handled if a
         # "last" was executed
-        $result.set-lastsema($semaphore) if $todo > 0;
+        $result.set-lastsema($semaphore) if $*LAST;
 
         # Return the result
         $output
