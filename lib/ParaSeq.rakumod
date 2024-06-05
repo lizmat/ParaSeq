@@ -1438,13 +1438,12 @@ class ParaSeq does Sequence {
 #- map -------------------------------------------------------------------------
 
     # Handling Callables that can have phasers
-    multi method map(ParaSeq:D: Block:D $Mapper) {
+    method !mapBlock($Mapper, str $method) {
         my      $SCHEDULER  := $!SCHEDULER;
         my uint $granularity = granularity($Mapper);
 
         my $mapper := (nqp::clone($Mapper) but BlockRunner).setup($granularity);
 
-        # Logic for queuing a buffer for map
         sub processor (
           uint $ordinal,
           uint $last,
@@ -1458,7 +1457,7 @@ class ParaSeq does Sequence {
                   $ordinal, $then, $input, $semaphore,
                   $mapper.run(
                     $ordinal == 0, $last,
-                    'map', $input, $!result, $semaphore
+                    $method, $input, $!result, $semaphore
                   )
                 );
             }
@@ -1469,14 +1468,14 @@ class ParaSeq does Sequence {
     }
 
     # Handling Callables that cannot have phasers
-    multi method map(ParaSeq:D: Callable:D $mapper) {
+    method !mapCallable($mapper, str $method) {
         my $SCHEDULER  := $!SCHEDULER;
 
         sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             $SCHEDULER.cue: {
                  my uint $then    = nqp::time;
 
-                $input.List.map($mapper).iterator.push-all(
+                $input.List."$method"($mapper).iterator.push-all(
                   my $output := nqp::create(IB)
                 );
 
@@ -1486,6 +1485,13 @@ class ParaSeq does Sequence {
 
         # Let's go!
         self!start(&processor, granularity($mapper))
+    }
+
+    multi method map(ParaSeq:D: Block:D $mapper) {
+        self!mapBlock($mapper, 'map')
+    }
+    multi method map(ParaSeq:D: Callable:D $mapper) {
+        self!mapCallable($mapper, 'map')
     }
 
 #- max -------------------------------------------------------------------------
