@@ -1,0 +1,51 @@
+use Test;
+use ParaSeq;
+
+plan 16;
+
+my constant $elems = 200;
+my constant $batch = 16;
+
+# Simple mapping
+my constant @list   = (^$elems).List;
+my constant $mapper = * * 2;
+my constant $map2   = @list.nodemap($mapper).List;
+
+# Blocks with a "last" in them
+my constant $lafter  = 23;
+my constant $mapper2 = { last if $_ == $lafter; $_ * 2 }
+my constant $last2   = @list.nodemap($mapper2).List;
+
+# Block with phasers in them
+my atomicint $ENTERseen;
+my atomicint $LEAVEseen;
+my $phasers := {
+    ENTER $ENTERseen⚛++;
+    LEAVE $LEAVEseen⚛++;
+    $_ * 2
+}
+
+for 1, ParaSeq.default-degree -> $degree {
+    my $seq := @list.&hyperize($batch, $degree).nodemap($mapper);
+    isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $map2,
+      "nodemap(\{ * %% 2 }) with degree = $degree";
+
+    $seq := @list.&hyperize($batch, $degree).nodemap($mapper2);
+    isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $last2,
+      "nodemap(\{ last if \$_ == $lafter; \$_ * 2 }) with degree = $degree";
+
+    $ENTERseen = $LEAVEseen = 0;
+    $seq := @list.&hyperize($batch, $degree).nodemap($phasers);
+    isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $map2,
+      "nodemap(\{ PHASERS; \$_ * 2 }) with degree = $degree";
+
+    is $ENTERseen, $elems,
+      "ENTER phaser fired for each iteration with degree $degree";
+    is $LEAVEseen, $elems,
+      "LEAVE phaser fired for each iteration with degree $degree";
+}
+
+# vim: expandtab shiftwidth=4

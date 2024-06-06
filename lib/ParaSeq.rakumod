@@ -1677,6 +1677,22 @@ class ParaSeq does Sequence {
     proto method minpairs(|) {*}
     multi method minpairs(ParaSeq:D: &by = &[cmp]) { self!limiter(-1, &by, 1) }
 
+#- nodemap ---------------------------------------------------------------------
+
+    multi method nodemap(ParaSeq:D: Block:D $mapper) {
+        my str @phasers;
+        nqp::push(@phasers,$_) if $mapper.has-phaser($_) for <FIRST NEXT LAST>;
+        warn "@phasers.join(", ") phaser(s) will be ignored" if @phasers;
+
+        my uint $granularity = granularity($mapper);
+        $granularity == 1
+          ?? self!mapBlock($mapper, 'nodemap', :no-first, :no-last)
+          !! die "Can only handle blocks with one parameter, got $granularity"
+    }
+    multi method nodemap(ParaSeq:D: Callable:D $mapper) {
+        self!mapCallable($mapper, 'nodemap')
+    }
+
 #- pairs -----------------------------------------------------------------------
 
     multi method pairs(ParaSeq:D:) {
@@ -1877,10 +1893,6 @@ class ParaSeq does Sequence {
 
     multi method keys(ParaSeq:D:) {
         self!pass-the-chain: self.Seq.keys.iterator
-    }
-
-    multi method nodemap(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.nodemap(|c).iterator
     }
 
     multi method pairup(ParaSeq:D:) {

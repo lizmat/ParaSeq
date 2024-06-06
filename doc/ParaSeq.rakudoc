@@ -388,7 +388,16 @@ has been implemented.
 
 =head2 nodemap
 
-L<C<.nodemap>|https://docs.raku.org/type/Any#method_nodemap>
+B<Status>: an optimized version of the
+L<C<.nodemap>|https://docs.raku.org/type/Any#method_nodemap> method
+has been implemented.
+
+B<Caveat>: to catch any execution of C<last>, the C<ParaSeq> module
+exports its own C<last> subroutine.  This means that any mapper code
+will either have to live within the scope in which the C<use ParaSeq>
+command is executed, B<or> will need to call the fully qualified
+C<ParaSeq::last> subroutine to ensure proper C<last> handling in
+a hypered C<.map>.
 
 =head2 pairs
 

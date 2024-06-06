@@ -286,7 +286,9 @@ minpairs
 nodemap
 -------
 
-[`.nodemap`](https://docs.raku.org/type/Any#method_nodemap)
+**Status**: an optimized version of the [`.nodemap`](https://docs.raku.org/type/Any#method_nodemap) method has been implemented.
+
+**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
 
 pairs
 -----
