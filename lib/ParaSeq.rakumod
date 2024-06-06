@@ -25,11 +25,11 @@ my constant IE = IterationEnd;
 my constant emptyIB   = nqp::create(IB);
 my constant emptyList = emptyIB.List;
 
-#- BlockRunner -----------------------------------------------------------------
+#- BlockMapper -----------------------------------------------------------------
 
 # A role to give a Block extra capabilities, needed to be able to run
 # map / grep like parallel sequences
-my role BlockRunner {
+my role BlockMapper {
     has uint $!granularity;  # the granularity of the Block
     has      $!FIRSTs;       # any FIRST phasers
     has      $!LASTs;        # any LAST phasers
@@ -1490,7 +1490,7 @@ class ParaSeq does Sequence {
         my      $SCHEDULER  := $!SCHEDULER;
         my uint $granularity = granularity($Mapper);
 
-        my $mapper := (nqp::clone($Mapper) but BlockRunner)
+        my $mapper := (nqp::clone($Mapper) but BlockMapper)
           .setup($granularity, |%_);
 
         sub processor (
