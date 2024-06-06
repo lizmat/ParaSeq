@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.0.10  2024-06-06T16:14:31+02:00
     - Re-imagine the handling of "last", by exporting a "last"
       subroutine.  Added Caveat as to the limitations this brings.
     - Updated status of ".deepmap" and added tests
