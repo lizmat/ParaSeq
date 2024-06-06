@@ -39,6 +39,8 @@ for 1, ParaSeq.default-degree -> $degree {
     $ENTERseen = $LEAVEseen = 0;
     $seq := @list.&hyperize($batch, $degree).duckmap($phasers);
     isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
+    todo("bug in duckmap, fixed 2024.06")
+      unless $degree == 1;
     is-deeply $seq.List, $map2,
       "duckmap(\{ PHASERS; \$_ * 2 }) with degree = $degree";
 
