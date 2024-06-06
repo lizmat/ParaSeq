@@ -299,10 +299,10 @@ been added for this method.
 
 =head2 flatmap
 
-B<status>: due to the fact that the
+B<status>: no specific support for the
 L<C<.flatmap>|https://docs.raku.org/type/List#method_flatmap> method
-has been DEPRECATED, no specific support for this method has been
-implemented.
+has been added, as its core implementation will do the right thing
+on C<ParaSeq> objects as well.
 
 =head2 grep
 

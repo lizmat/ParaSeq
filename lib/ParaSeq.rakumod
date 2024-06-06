@@ -1878,11 +1878,6 @@ class ParaSeq does Sequence {
         self!pass-the-chain: self.List.flat.iterator
     }
 
-    proto method flatmap(|) {*}
-    multi method flatmap(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.flatmap(|c).iterator
-    }
-
     multi method head(ParaSeq:D: $what) {
         self!pass-the-chain: self.Seq.head($what).iterator
     }

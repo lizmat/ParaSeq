@@ -221,7 +221,7 @@ flat
 flatmap
 -------
 
-**status**: due to the fact that the [`.flatmap`](https://docs.raku.org/type/List#method_flatmap) method has been DEPRECATED, no specific support for this method has been implemented.
+**status**: no specific support for the [`.flatmap`](https://docs.raku.org/type/List#method_flatmap) method has been added, as its core implementation will do the right thing on `ParaSeq` objects as well.
 
 grep
 ----
