@@ -221,7 +221,7 @@ flat
 flatmap
 -------
 
-[`.flatmap`](https://docs.raku.org/type/List#method_flatmap)
+**status**: due to the fact that the [`.flatmap`](https://docs.raku.org/type/List#method_flatmap) method has been DEPRECATED, no specific support for this method has been implemented.
 
 grep
 ----

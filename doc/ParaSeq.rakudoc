@@ -299,7 +299,10 @@ been added for this method.
 
 =head2 flatmap
 
-L<C<.flatmap>|https://docs.raku.org/type/List#method_flatmap>
+B<status>: due to the fact that the
+L<C<.flatmap>|https://docs.raku.org/type/List#method_flatmap> method
+has been DEPRECATED, no specific support for this method has been
+implemented.
 
 =head2 grep
 

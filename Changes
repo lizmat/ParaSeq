@@ -6,6 +6,7 @@ Revision history for ParaSeq
     - Updated status of ".deepmap" and added tests
     - Updated status of ".duckmap" and added tests
     - Updated status of ".nodemap" and added tests
+    - Updated status of ".flatmap"
 
 0.0.9  2024-06-04T14:40:13+02:00
     - Updated status of ".map", added support for
