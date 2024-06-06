@@ -372,7 +372,7 @@ sort
 squish
 ------
 
-[`.squish`](https://docs.raku.org/type/Any#method_squish)
+**Status**: Because the [`.squish`](https://docs.raku.org/type/Any#method_squish) method is already **highly** optimized, adding specific hypering would only slow down execution. So no specific hypering support has been added.
 
 tail
 ----

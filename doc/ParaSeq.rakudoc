@@ -516,7 +516,10 @@ hypering logic has been added for this method.
 
 =head2 squish
 
-L<C<.squish>|https://docs.raku.org/type/Any#method_squish>
+B<Status>: Because the
+L<C<.squish>|https://docs.raku.org/type/Any#method_squish> method
+is already B<highly> optimized, adding specific hypering would only
+slow down execution.  So no specific hypering support has been added.
 
 =head2 tail
 

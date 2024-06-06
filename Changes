@@ -1,6 +1,7 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+    - Updated status of ".squish" and added tests
 
 0.0.10  2024-06-06T16:14:31+02:00
     - Re-imagine the handling of "last", by exporting a "last"
