@@ -1,0 +1,55 @@
+use Test;
+use ParaSeq;
+
+plan 16;
+
+my constant $elems = 200;
+my constant $batch = 16;
+
+# Simple mapping
+my constant @list   = (^$elems).List;
+my constant $mapper = -> $_ where * %% 5 { $_ * 2 }
+my constant $map2   = @list.duckmap($mapper).List;
+
+# Blocks with a "last" in them
+my constant $lafter  = 23;
+my constant $mapper2 = -> $_ where * %% 5 { last if $_ == $lafter; $_ * 2 }
+my constant $last2   = @list.duckmap($mapper2).List;
+
+# Block with phasers in them
+my atomicint $ENTERseen;
+my atomicint $LEAVEseen;
+my $phasers := -> $_ where * %% 5 {
+    ENTER $ENTERseen⚛++;
+    LEAVE $LEAVEseen⚛++;
+    $_ * 2
+}
+
+for 1, ParaSeq.default-degree -> $degree {
+    my $seq := @list.&hyperize($batch, $degree).duckmap($mapper);
+    isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $map2,
+      "duckmap(-> \$_ where * %% 5 \{ * %% 2 }) with degree = $degree";
+
+    $seq := @list.&hyperize($batch, $degree).duckmap($mapper2);
+    isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $last2,
+      "duckmap(-> \$_ where * %% 5 \{ last if \$_ == $lafter; \$_ * 2 }) with degree = $degree";
+
+    $ENTERseen = $LEAVEseen = 0;
+    $seq := @list.&hyperize($batch, $degree).duckmap($phasers);
+    isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
+    is-deeply $seq.List, $map2,
+      "duckmap(\{ PHASERS; \$_ * 2 }) with degree = $degree";
+
+    todo("ENTER executed for each batch until 2024.06")
+      unless $degree == 1;
+    is $ENTERseen, $elems / 5,
+      "ENTER phaser fired for each iteration with degree $degree";
+    todo("LEAVE executed for each batch until 2024.06")
+      unless $degree == 1;
+    is $LEAVEseen, $elems / 5,
+      "LEAVE phaser fired for each iteration with degree $degree";
+}
+
+# vim: expandtab shiftwidth=4

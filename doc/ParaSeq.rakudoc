@@ -273,7 +273,22 @@ a hypered C<.map>.
 
 =head2 duckmap
 
-L<C<.duckmap>|https://docs.raku.org/type/Any#method_duckmap>
+B<Status>: an optimized version of the
+L<C<.duckmap>|https://docs.raku.org/type/Any#method_duckmap> method
+has been implemented.
+
+B<Caveat>: to catch any execution of C<last>, the C<ParaSeq> module
+exports its own C<last> subroutine.  This means that any mapper code
+will either have to live within the scope in which the C<use ParaSeq>
+command is executed, B<or> will need to call the fully qualified
+C<ParaSeq::last> subroutine to ensure proper C<last> handling in
+a hypered C<.map>.
+
+B<Caveat>: due to the way C<duckmap> was implemented before the
+C<2024.06> release of Rakudo, the C<LEAVE> phaser would get called
+for every value attempted.  This has since been fixed, so that the
+C<ENTER> and C<LEAVE> phasers are only called if the C<Callable>
+is actually invoked.
 
 =head2 flat
 

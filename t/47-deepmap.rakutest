@@ -28,18 +28,19 @@ my $phasers = {
 for 1, ParaSeq.default-degree -> $degree {
     my $seq := @list.&hyperize($batch, $degree).deepmap(* * 2);
     isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
-    is-deeply $seq.List, $map2, "map(* %% 2) with degree = $degree";
+    is-deeply $seq.List, $map2,
+      "deepmap(* %% 2) with degree = $degree";
 
     $seq := @list.&hyperize($batch, $degree).deepmap($mapper2);
     isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
     is-deeply $seq.List, $last2,
-      "map(\{ last if \$_ == $lafter; \$_ * 2 }) with degree = $degree";
+      "deepmap(\{ last if \$_ == $lafter; \$_ * 2 }) with degree = $degree";
 
     $ENTERseen = $LEAVEseen = 0;
     $seq := @list.&hyperize($batch, $degree).deepmap($phasers);
     isa-ok $seq, $degree == 1 ?? List !! ParaSeq;
     is-deeply $seq.List, $map2,
-      "map(\{ PHASERS; \$_ * 2 }) with degree = $degree";
+      "deepmap(\{ PHASERS; \$_ * 2 }) with degree = $degree";
 
     todo("FIRST flag executed for each batch until 2024.06")
       unless $degree == 1;

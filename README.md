@@ -200,12 +200,18 @@ combinations
 deepmap
 -------
 
-[`.deepmap`](https://docs.raku.org/type/Any#method_deepmap)
+**Status**: an optimized version of the [`.deepmap`](https://docs.raku.org/type/Any#method_deepmap) method has been implemented.
+
+**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
 
 duckmap
 -------
 
-[`.duckmap`](https://docs.raku.org/type/Any#method_duckmap)
+**Status**: an optimized version of the [`.duckmap`](https://docs.raku.org/type/Any#method_duckmap) method has been implemented.
+
+**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
+
+**Caveat**: due to the way `duckmap` was implemented before the `2024.06` release of Rakudo, the `LEAVE` phaser would get called for every value attempted. This has since been fixed, so that the `ENTER` and `LEAVE` phasers are only called if the `Callable` is actually invoked.
 
 flat
 ----
