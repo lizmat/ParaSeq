@@ -1282,19 +1282,7 @@ class ParaSeq does Sequence {
     # Handling Callables that can have phasers
     multi method grep(ParaSeq:D: Block:D $matcher, :$k, :$kv, :$p) {
         my $SCHEDULER := $!SCHEDULER;
-        my uint $base;  # base offset for :k, :kv, :p
-
-        # Logic for queuing a buffer for bare grep { }, producing values
-        sub v(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
-            $SCHEDULER.cue: {
-                my uint $then    = nqp::time;
-                my      $output := nqp::create(IB);
-
-                $input.Seq.grep($matcher).iterator.push-all($output);
-
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
+        my uint $base;  # base offset to be added for each batch
 
         # Logic for queuing a buffer for grep { } :k
         sub k(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
@@ -1356,12 +1344,19 @@ class ParaSeq does Sequence {
             }
         }
 
-        # Let's go!
-        self!start(
-          $k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v,
-          granularity($matcher),
-          :slow
-        )
+        # Let's go using local logic
+        if $k || $kv || $p { 
+            self!start(
+              $k ?? &k !! $kv ?? &kv !! &p,
+              granularity($matcher),
+              :slow
+            )   
+        }       
+
+        # Use standard "map-like" handling
+        else {
+            self!mapBlock($matcher, 'grep')
+        }
     }
 
     # Handling other Callables that cannot have phasers
