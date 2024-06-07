@@ -438,7 +438,10 @@ hypering logic has been added for this method.
 
 =head2 repeated
 
-L<C<.repeated>|https://docs.raku.org/type/Any#method_repeated>
+B<Status>: the nature of the
+L<C<.repeated>|https://docs.raku.org/type/Any#method_repeated> method
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for this method.
 
 =head2 reverse
 

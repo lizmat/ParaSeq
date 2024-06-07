@@ -1,0 +1,34 @@
+use Test;
+use ParaSeq;
+
+plan 24;
+
+my constant $elems    = 10000;
+my constant $list     = (^$elems).pick(*).List;
+my constant $batch    = 16;
+my constant $repeated   = $list.repeated.List;
+my constant $as       = * div 100;
+my constant $hundreds = $list.repeated(:$as).List;
+my constant $same     = (1 xx $elems).List;
+my constant $one      = $same.repeated.List;
+
+for 1, ParaSeq.default-degree {
+    for &[===], &[==] -> $with {
+        my $seq := $list.&hyperize($batch, $_).repeated(:$with);
+        isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+        is-deeply $seq.List, $repeated,
+          "list.repeated with degree = $_ with $with.name()";
+
+        $seq := $list.&hyperize($batch, $_).repeated(:$with, :$as);
+        isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+        is-deeply $seq.List, $hundreds,
+          "list.repeated(:as(* div 100)) with degree = $_ with $with.name()";
+
+        $seq := $same.&hyperize($batch, $_).repeated(:$with);
+        isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+        is-deeply $seq.List, $one,
+          "same.repeated with degree = $_ with $with.name()";
+    }
+}
+
+# vim: expandtab shiftwidth=4

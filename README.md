@@ -318,7 +318,7 @@ produce
 repeated
 --------
 
-[`.repeated`](https://docs.raku.org/type/Any#method_repeated)
+**Status**: the nature of the [`.repeated`](https://docs.raku.org/type/Any#method_repeated) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 reverse
 -------
