@@ -161,7 +161,8 @@ my class ParaQueue is repr('ConcBlockingQueue') { }
 # of the values from the buffer, and then from the iterator
 
 my class BufferIterator does Iterator {
-    has $!parent;    # ParaSeq parent object
+    has $!parent     # ParaSeq parent object
+      handles <is-lazy is-deterministic is-monotonically-increasing>;
     has $!buffer;    # first buffer to produce from
     has $!iterator;  # iterator to produce from onwards
 
@@ -213,7 +214,8 @@ my class BufferIterator does Iterator {
 # using .squish semantics
 
 my class SquishIterator does Iterator {
-    has $!source;   # source iterator
+    has $!source    # source iterator
+      handles <is-lazy is-deterministic is-monotonically-increasing>;
     has $!as;       # any transformation prior to comparison
     has $!with;     # comparator to be used
     has $!current;  # the current buffer producing values
@@ -274,7 +276,6 @@ my class SquishIterator does Iterator {
           )
         );
     }
-
 }
 
 #- WhichIterator ---------------------------------------------------------------
@@ -385,7 +386,9 @@ my class UniqueIterator does Iterator {
 # and removed in a thread-safe manner
 
 my class ParaIterator does Iterator {
-    has           $!parent;     # ParaSeq parent object
+    has $!parent                # ParaSeq parent object
+      handles <is-lazy is-deterministic is-monotonically-increasing>;
+
     has           $!current;    # current producer
     has ParaQueue $!queues;     # other queues to produce from
     has ParaQueue $!pressure;   # backpressure provider
@@ -981,6 +984,12 @@ class ParaSeq does Sequence {
     multi method is-lazy(ParaSeq:D:) {
         nqp::hllbool($!source.is-lazy && nqp::not_i($!stop-after))
     }
+    method is-deterministic(ParaSeq:D:) {
+        nqp::hllbool($!source.is-deterministic)
+    }
+    method is-monotonically-increasing(ParaSeq:D:) {
+        nqp::hllbool($!source.is-monotonically-increasing)
+    }
 
     method stats( ParaSeq:D:) { $!result.stats.List }
 
@@ -1438,7 +1447,7 @@ class ParaSeq does Sequence {
         )
     }
 
-    # Handling smart-matchinng logic
+    # Handling smart-matching logic
     multi method grep(ParaSeq:D: $matcher, :$k, :$kv, :$p) {
         my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset for :k, :kv, :p
