@@ -26,9 +26,9 @@ my constant emptyIB   = nqp::create(IB);
 my constant emptyList = emptyIB.List;
 
 #- BlockMapper -----------------------------------------------------------------
-
 # A role to give a Block extra capabilities, needed to be able to run
 # map / grep like parallel sequences
+
 my role BlockMapper {
     has uint $!granularity;  # the granularity of the Block
     has      $!FIRSTs;       # any FIRST phasers
@@ -79,7 +79,7 @@ my role BlockMapper {
         self
     }
 
-    # The actual running logi, which makes sure that any FIRST / LAST phasers
+    # The actual running logic, which makes sure that any FIRST / LAST phasers
     # are only run once, and any "last" in the block is also handled as
     # expected
     method run(
@@ -131,8 +131,8 @@ my role BlockMapper {
             }
         }) if $!LASTs;
 
-        # Actually run the method with all the named arguments
-        $input.List."$method"($this-mapper, |%_).iterator.push-all(
+        # Actually run the method
+        $input.List."$method"($this-mapper).iterator.push-all(
           my $output := nqp::create(IB)
         );
 
@@ -1571,8 +1571,7 @@ class ParaSeq does Sequence {
         my      $SCHEDULER  := $!SCHEDULER;
         my uint $granularity = granularity($Mapper);
 
-        my $mapper := (nqp::clone($Mapper) but BlockMapper)
-          .setup($granularity, |%_);
+        my $mapper := (nqp::clone($Mapper) but BlockMapper).setup($granularity);
 
         sub processor (
           uint $ordinal,
@@ -2031,7 +2030,7 @@ class ParaSeq does Sequence {
 
     proto method repeated(|) {*}
     multi method repeated(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.repeated(|c).iterator
+        self!pass-the-chain: self.List.repeated(|c).iterator
     }
 
     multi method reverse(ParaSeq:D:) {
