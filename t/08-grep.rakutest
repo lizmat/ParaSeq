@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 76;
+plan 84;
 
 my constant $elems = 200000;
 my constant $batch = 16;
@@ -17,8 +17,11 @@ my constant $grep2p   = @list.grep($grepper, :p).List;
 my constant $grep2kv  = @list.grep($grepper, :kv).List;
 #my constant $grep2kve = @list.grep($grepper, :kv, :end).List;
 
-my constant $grepc2 = @list.grep(-> $a, $b          { True }).List;
-my constant $grepc4 = @list.grep(-> $a, $b, $c, $d  { True }).List;
+my constant $grepc2 = @list.grep(-> $a, $b         { True      }).List;
+my constant $grepc4 = @list.grep(-> $a, $b, $c, $d { True      }).List;
+
+my constant $last   = 23456;
+my constant $grep2l =  @list.grep({ last if $_ == $last; $_ %% 2}).List;
 
 # Block with phasers in them
 my atomicint $ENTERseen;
@@ -26,6 +29,13 @@ my atomicint $LEAVEseen;
 my $phasers = {
     ENTER $ENTERseen⚛++;
     LEAVE $LEAVEseen⚛++;
+    $_ %% 2
+}
+
+my $lastphasers = {
+    ENTER $ENTERseen⚛++;
+    LEAVE $LEAVEseen⚛++;
+    last if $_ == $last;
     $_ %% 2
 }
 
@@ -95,6 +105,16 @@ for 1, ParaSeq.default-degree {
         is $LEAVEseen, $elems,
           "LEAVE phaser :$named fired for each iteration with degree $_";
     }
+
+    $ENTERseen = $LEAVEseen = 0;
+    $seq := @list.&hyperize($batch, $_).grep($lastphasers);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $grep2l,
+      "grep(\{ last if \$_ == $last; PHASERS) with degree = $_";
+    ok $ENTERseen >= $last,
+      "ENTER phaser fired for each iteration with degree $_";
+    ok $LEAVEseen >= $last,
+      "LEAVE phaser fired for each iteration with degree $_";
 
     $seq := @list.&hyperize($batch, $_).grep(-> $a, $b { True });
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
