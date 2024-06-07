@@ -4,6 +4,7 @@ Revision history for ParaSeq
     - Updated status of ".squish" and added tests
     - Fixed an edge case in the slow batcher
     - Updated status of ".repeated" and added tests
+    - Updated status of ".grep" and added tests
 
 0.0.10  2024-06-06T16:14:31+02:00
     - Re-imagine the handling of "last", by exporting a "last"

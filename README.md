@@ -28,6 +28,11 @@ ParaSeq provides the functional equivalent of [`hyper`](https://docs.raku.org/ty
 
 As such it exports two subroutines `hyperize` and `racify`, to make them plug-in compatible with the [`hyperize`](https://raku.land/zef:lizmat/hyperize) distribution.
 
+STATUS
+------
+
+This module is now considered to be in BETA, as all features mentioned in the [IMPROVEMENTS](IMPROVEMENTS) section have been implemented.
+
 SUBROUTINES
 ===========
 

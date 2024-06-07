@@ -34,6 +34,11 @@ As such it exports two subroutines C<hyperize> and C<racify>, to
 make them plug-in compatible with the
 L<C<hyperize>|https://raku.land/zef:lizmat/hyperize> distribution.
 
+=head2 STATUS
+
+This module is now considered to be in BETA, as all features
+mentioned in the L<IMPROVEMENTS> section have been implemented.
+
 =head1 SUBROUTINES
 
 =head2 hyperize
