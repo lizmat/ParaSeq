@@ -207,7 +207,77 @@ my class BufferIterator does Iterator {
     method stats(--> emptyList) { }
 }
 
-#- WhichIterator -------------------------------------------------------------
+#- SquishIterator --------------------------------------------------------------
+# An iterator that takes a source iterator that produces batches of values
+# and which compares the last of a batch with the first of the next batch
+# using .squish semantics
+
+my class SquishIterator does Iterator {
+    has $!source;   # source iterator
+    has $!as;       # any transformation prior to comparison
+    has $!with;     # comparator to be used
+    has $!current;  # the current buffer producing values
+    has $!last;     # last value seen of the current buffer
+
+    method new($source, &as, &with) {
+        my $self := nqp::create(self);
+        nqp::bindattr($self,SquishIterator,'$!source', $source         );
+        nqp::bindattr($self,SquishIterator,'$!as',     &as             );
+        nqp::bindattr($self,SquishIterator,'$!with',   &with           );
+        nqp::bindattr($self,SquishIterator,'$!current',$source.pull-one);
+        $self
+    }
+
+    method !next-batch() {
+        my $current := $!source.pull-one;
+        if nqp::eqaddr($current,IE) {
+            IterationEnd
+        }
+        else {
+            my $nextlast := nqp::atpos($current,-1);
+            nqp::shift($current)
+              if $!with($!as(nqp::atpos($current,0)),$!as($!last));
+
+            nqp::elems($!current := $current)
+              ?? nqp::shift($current)
+              !! self!next-batch
+        }
+    }
+
+    method pull-one() {
+        nqp::elems(my $current := $!current) > 1
+          ?? nqp::shift($current)
+          !! nqp::elems($current)
+            ?? ($!last = nqp::shift($current))
+            !! self!next-batch
+    }
+
+    method push-all(\target --> IterationEnd) {
+        my $source  := $!source;
+        my &as      := $!as;
+        my &with    := $!with;
+        my $current := $!current;
+
+        my $last := nqp::elems($current) ?? nqp::atpos($current,-1) !! $!last;
+        target.append($current);
+
+        nqp::until(
+          nqp::eqaddr(($current := $source.pull-one),IE),
+          nqp::stmts(
+            (my $nextlast := nqp::atpos($current,-1)),
+            nqp::if(
+              with(as(nqp::atpos($current,0)),as($last)),
+              nqp::shift($current)
+            ),
+            ($last := $nextlast),
+            target.append($current)
+          )
+        );
+    }
+
+}
+
+#- WhichIterator ---------------------------------------------------------------
 # An iterator that takes a buffer filled with values on even locations, and
 # .WHICH strings on odd values, and produces just the values on the even
 # positions
@@ -1727,6 +1797,48 @@ class ParaSeq does Sequence {
         self!start(&processor)
     }
 
+#- squish ----------------------------------------------------------------------
+# The squish method only uses a hypered approach if it is a non-standard one
+# as the standard one is too optimized already to make the hypering overhead
+# make sense
+
+    proto method squish(|) {*}
+    multi method squish(ParaSeq:D: :&as = &identity, :&with = &[===]) {
+
+        # Set iterator to be used, default if nothing special
+        my $iterator := do if nqp::eqaddr(&as,&identity)
+          && nqp::eqaddr(&with,&[===]) {
+            self.List.squish.iterator
+        }
+
+        # Either a non-standard "as" or "with", hypering then *does make sense
+        else {
+            my $SCHEDULER := $!SCHEDULER;
+
+            sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
+                $SCHEDULER.cue: {
+                    my uint $then = nqp::time;
+
+                    $input.Seq.squish(:&as, :&with).iterator.push-all(
+                      my $batch := nqp::create(IB)
+                    );
+
+                    # Change each batch into a single element
+                    nqp::push((my $output := nqp::create(IB)),$batch);
+
+                    self!batch-done(
+                      $ordinal, $then, $input, $semaphore, $output
+                    );
+                }
+            }
+
+            # Let's go!
+            SquishIterator.new: self!start(&processor).iterator, &as, &with
+        }
+
+        self!pass-the-chain: $iterator
+    }
+
 #- unique ----------------------------------------------------------------------
 # The unique method uses a 2 stage approach: the first stage is having all
 # the threads produce "their" unique values, with a "seen" hash for each
@@ -1969,11 +2081,6 @@ class ParaSeq does Sequence {
     }
     multi method sort(ParaSeq:D: Callable:D $how) {
         self!pass-the-chain: self.List.sort($how).iterator
-    }
-
-    proto method squish(|) {*}
-    multi method squish(ParaSeq:D: |c) {
-        self!pass-the-chain: self.Seq.squish(|c).iterator
     }
 
     multi method tail(ParaSeq:D: $what) {

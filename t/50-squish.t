@@ -3,7 +3,7 @@ use ParaSeq;
 
 plan 24;
 
-my constant $elems    = 10000;
+my constant $elems    = 200000;
 my constant $list     = (^$elems).pick(*).List;
 my constant $batch    = 16;
 my constant $squish   = $list.squish.List;
