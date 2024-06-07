@@ -31,7 +31,7 @@ As such it exports two subroutines `hyperize` and `racify`, to make them plug-in
 STATUS
 ------
 
-This module is now considered to be in BETA, as all features mentioned in the [IMPROVEMENTS](IMPROVEMENTS) section have been implemented.
+This module is now considered to be in BETA, as all features mentioned in the [IMPROVEMENTS](#IMPROVEMENTS) section have been implemented.
 
 SUBROUTINES
 ===========
