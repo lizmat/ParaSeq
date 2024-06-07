@@ -1355,7 +1355,7 @@ class ParaSeq does Sequence {
 
         # Use standard "map-like" handling
         else {
-            self!mapBlock($matcher, 'grep')
+            self!mapBlock($matcher, 'grep', :no-first, :no-last)
         }
     }
 
@@ -1562,7 +1562,7 @@ class ParaSeq does Sequence {
 #- map -------------------------------------------------------------------------
 
     # Handling Callables that can have phasers
-    method !mapBlock($Mapper, str $method) {
+    method !mapBlock($Mapper, $method) {
         my      $SCHEDULER  := $!SCHEDULER;
         my uint $granularity = granularity($Mapper);
 

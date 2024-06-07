@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 44;
+plan 52;
 
 my constant $elems = 200000;
 my constant $batch = 16;
@@ -19,6 +19,15 @@ my constant $grep2kv  = @list.grep($grepper, :kv).List;
 
 my constant $grepc2 = @list.grep(-> $a, $b          { True }).List;
 my constant $grepc4 = @list.grep(-> $a, $b, $c, $d  { True }).List;
+
+# Block with phasers in them
+my atomicint $ENTERseen;
+my atomicint $LEAVEseen;
+my $phasers = {
+    ENTER $ENTERseen⚛++;
+    LEAVE $LEAVEseen⚛++;
+    $_ %% 2
+}
 
 my subset Even of Int where * %% 2;
 my constant $grepm   = @list.grep(Even).List;
@@ -66,6 +75,16 @@ for 1, ParaSeq.default-degree {
 #    $seq := @list.&hyperize($batch, $_).grep($grepper, :kv, :end);
 #    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
 #    is-deeply $seq.List, $grep2kve, "grep(* %% 2, :kv, :end) with degree = $_";
+
+    $ENTERseen = $LEAVEseen = 0;
+    $seq := @list.&hyperize($batch, $_).grep($phasers);
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $grep2, "grep(PHASERS) with degree = $_";
+
+    is $ENTERseen, $elems,
+      "ENTER phaser fired for each iteration with degree $_";
+    is $LEAVEseen, $elems,
+      "LEAVE phaser fired for each iteration with degree $_";
 
     $seq := @list.&hyperize($batch, $_).grep(-> $a, $b { True });
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
