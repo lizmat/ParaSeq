@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 52;
+plan 76;
 
 my constant $elems = 200000;
 my constant $batch = 16;
@@ -80,11 +80,21 @@ for 1, ParaSeq.default-degree {
     $seq := @list.&hyperize($batch, $_).grep($phasers);
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
     is-deeply $seq.List, $grep2, "grep(PHASERS) with degree = $_";
-
     is $ENTERseen, $elems,
       "ENTER phaser fired for each iteration with degree $_";
     is $LEAVEseen, $elems,
       "LEAVE phaser fired for each iteration with degree $_";
+
+    for 'k', $grep2k, 'kv', $grep2kv, 'p', $grep2p -> $named, $result {
+        $ENTERseen = $LEAVEseen = 0;
+        $seq := @list.&hyperize($batch, $_).grep($phasers, |{ $named => True });
+        isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+        is-deeply $seq.List, $result, "grep(PHASERS, :$named) with degree = $_";
+        is $ENTERseen, $elems,
+          "ENTER phaser :$named fired for each iteration with degree $_";
+        is $LEAVEseen, $elems,
+          "LEAVE phaser :$named fired for each iteration with degree $_";
+    }
 
     $seq := @list.&hyperize($batch, $_).grep(-> $a, $b { True });
     isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;

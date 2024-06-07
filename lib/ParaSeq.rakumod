@@ -79,7 +79,7 @@ my role BlockMapper {
         self
     }
 
-    # The actual running logi, which makes sure that any FIRST / LAST phasers
+    # The actual running logic, which makes sure that any FIRST / LAST phasers
     # are only run once, and any "last" in the block is also handled as
     # expected
     method run(
@@ -88,7 +88,8 @@ my role BlockMapper {
       str  $method,            # method to be executed
            $input     is raw,  # the IterationBuffer to work on
            $result    is raw,  # the result iterator
-           $semaphore is raw   # the semaphore to which result will be pushed
+           $semaphore is raw,  # the semaphore to which result will be pushed
+           $postprocess?       # any postprocessing to be done
     ) {
         # Make sure we have our own mapper / phasers
         my $this-mapper  := nqp::clone(self);
@@ -131,10 +132,20 @@ my role BlockMapper {
             }
         }) if $!LASTs;
 
-        # Actually run the method with all the named arguments
-        $input.List."$method"($this-mapper, |%_).iterator.push-all(
-          my $output := nqp::create(IB)
-        );
+        # Fetch the iterator and setup output buffer
+        my $iterator := $input.List."$method"($this-mapper, |%_).iterator;
+        my $output   := nqp::create(IB);
+
+        if $postprocess {
+            nqp::until(
+              nqp::eqaddr((my $pulled := $iterator.pull-one),IE),
+              $postprocess($iterator, $output, $pulled)
+            );
+        }
+        else {
+            # Just run the method with all the named arguments
+            $iterator.push-all($output);
+        }
 
         # Mark this semaphore as the last to be handled if a
         # "last" was executed
@@ -1281,76 +1292,61 @@ class ParaSeq does Sequence {
 
     # Handling Callables that can have phasers
     multi method grep(ParaSeq:D: Block:D $matcher, :$k, :$kv, :$p) {
-        my $SCHEDULER := $!SCHEDULER;
-        my uint $base;  # base offset to be added for each batch
 
-        # Logic for queuing a buffer for grep { } :k
-        sub k(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
-            my uint $offset = $base;
-            $base = $base + nqp::elems($input);
-
-            $SCHEDULER.cue: {
-                my uint $then    = nqp::time;
-                my      $output := nqp::create(IB);
-
-                my $iterator := $input.Seq.grep($matcher, :k).iterator;
-                nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
-                  nqp::push($output,$offset + $key)
-                );
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
-        # Logic for queuing a buffer for grep { } :kv
-        sub kv(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
-            my uint $offset = $base;
-            $base = $base + nqp::elems($input);
-
-            $SCHEDULER.cue: {
-                my uint $then    = nqp::time;
-                my      $output := nqp::create(IB);
-
-                my $iterator := $input.Seq.grep($matcher, :kv).iterator;
-                nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
-                  nqp::stmts(
-                    nqp::push($output,$offset + $key),     # key
-                    nqp::push($output,$iterator.pull-one)  # value
-                  )
-                );
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
-        # Logic for queuing a buffer for grep { } :p
-        sub p(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
-            my uint $offset = $base;
-            $base = $base + nqp::elems($input);
-
-            $SCHEDULER.cue: {
-                my uint $then    = nqp::time;
-                my      $output := nqp::create(IB);
-
-                my $iterator := $input.Seq.grep($matcher, :kv).iterator;
-                nqp::until(
-                  nqp::eqaddr((my $key := $iterator.pull-one),IE),
-                  nqp::push(
-                    $output,
-                    Pair.new($offset + $key, $iterator.pull-one)
-                  )
-                );
-                self!batch-done($ordinal, $then, $input, $semaphore, $output);
-            }
-        }
-
-        # Let's go using local logic
+        # Need to have postprocessing
         if $k || $kv || $p { 
-            self!start(
-              $k ?? &k !! $kv ?? &kv !! &p,
-              granularity($matcher),
-              :slow
-            )   
+            my      $SCHEDULER  := $!SCHEDULER;
+            my uint $granularity = granularity($matcher);
+            my uint $base;  # base offset to be added for each batch
+
+            my %nameds := Map.new( $k ?? :k !! :kv );
+            my $mapper := (nqp::clone($matcher) but BlockMapper)
+              .setup($granularity, :no-first, :no-last);
+
+            sub processor(
+              uint $ordinal,
+              uint $last,
+                   $input     is raw,
+                   $semaphore is raw,
+            ) {
+                my uint $offset = $base;
+                $base = $base + nqp::elems($input);
+
+                # Set up post-processor depend on named argument.  Needs
+                # to be done here because of scoping of $offset
+                my $postprocess := $k
+                  ?? -> $, $output is raw, $key {
+                         nqp::push($output,$offset + $key)
+                     }
+                  !! $kv
+                    ?? -> $iterator, $output is raw, $key {
+                           nqp::push($output,$offset + $key),     # key
+                           nqp::push($output,$iterator.pull-one)  # value
+                       }
+                    !! -> $iterator, $output is raw, $key {
+                           nqp::push(
+                             $output,
+                             Pair.new($offset + $key, $iterator.pull-one)
+                           )
+                       }
+
+                # Cue the actual work
+                $SCHEDULER.cue: {
+                    my uint $then = nqp::time;
+
+                    self!batch-done(
+                      $ordinal, $then, $input, $semaphore,
+                      $mapper.run(
+                        $ordinal == 0, $last,
+                        'grep', $input, $!result, $semaphore,
+                        $postprocess, |%nameds
+                      )
+                    );
+                }
+            }
+
+            # Let's go using the slower path
+            self!start(&processor, $granularity, :slow)
         }       
 
         # Use standard "map-like" handling
