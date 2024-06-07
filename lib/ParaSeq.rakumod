@@ -808,7 +808,7 @@ class ParaSeq does Sequence {
             my $snitcher := $!snitcher;
 
             my uint $ordinal; # ordinal number of batch
-            my uint $needed;  # number of values to still fetch
+            my  int $needed;  # number of values to still fetch
 
             # flag: 1 if exhausted
             my uint $exhausted =
@@ -823,6 +823,8 @@ class ParaSeq does Sequence {
             until $exhausted || nqp::atomicload_i($!stop) {
                 # Wait for ok to proceed
                 $needed = granulize(nqp::shift($pressure)) - 1;
+
+die "needed = $needed" if $needed < 0;
 
                 # Setup buffer with initial value
                 nqp::push((my $buffer := nqp::create(IB)),$initial);
