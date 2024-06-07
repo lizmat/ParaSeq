@@ -126,7 +126,7 @@ An optimized version of the [`.end`](https://docs.raku.org/type/List#routine_end
 first
 -----
 
-The [`.first`](https://docs.raku.org/type/List#routine_first) method is supported without any specific hypering support added as it turned out to be impossible to make it faster..
+The [`.first`](https://docs.raku.org/type/List#routine_first) method is supported without any specific hypering support added as it turned out to be impossible to make it faster.
 
 head
 ----

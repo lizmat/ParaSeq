@@ -171,7 +171,7 @@ been implemented.
 
 The L<C<.first>|https://docs.raku.org/type/List#routine_first> method
 is supported without any specific hypering support added as it
-turned out to be impossible to make it faster..
+turned out to be impossible to make it faster.
 
 =head2 head
 
