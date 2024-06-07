@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.1.0  2024-06-07T21:36:23+02:00
     - Updated status of ".squish" and added tests
     - Fixed an edge case in the slow batcher
     - Updated status of ".repeated" and added tests
