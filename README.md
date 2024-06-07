@@ -180,34 +180,34 @@ In alphabetical order:
 antipairs
 ---------
 
-**Status**: an optimized version of the [`.antipairs`](https://docs.raku.org/type/List#routine_antipairs) method has been implemented.
+An optimized version of the [`.antipairs`](https://docs.raku.org/type/List#routine_antipairs) method has been implemented.
 
 batch
 -----
 
-**Status**: an optimized version of the [`.batch`](https://docs.raku.org/type/List#method_batch) method has been implemented.
+An optimized version of the [`.batch`](https://docs.raku.org/type/List#method_batch) method has been implemented.
 
 collate
 -------
 
-**Status**: the nature of the [`.collate`](https://docs.raku.org/type/Any#method_collate) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.collate`](https://docs.raku.org/type/Any#method_collate) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 combinations
 ------------
 
-**Status**: the nature of the [`.combinations`](https://docs.raku.org/type/List#routine_combinations) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.combinations`](https://docs.raku.org/type/List#routine_combinations) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 deepmap
 -------
 
-**Status**: an optimized version of the [`.deepmap`](https://docs.raku.org/type/Any#method_deepmap) method has been implemented.
+An optimized version of the [`.deepmap`](https://docs.raku.org/type/Any#method_deepmap) method has been implemented.
 
 **Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
 
 duckmap
 -------
 
-**Status**: an optimized version of the [`.duckmap`](https://docs.raku.org/type/Any#method_duckmap) method has been implemented.
+An optimized version of the [`.duckmap`](https://docs.raku.org/type/Any#method_duckmap) method has been implemented.
 
 **Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
 
@@ -216,42 +216,46 @@ duckmap
 flat
 ----
 
-**Status**: the [`.flat`](https://docs.raku.org/type/Any#method_flat) method is already very simple, and adding hypering overhead would do just that: add overhead. Therefore, **no** specific hypering logic has been added for this method.
+The [`.flat`](https://docs.raku.org/type/Any#method_flat) method is already very simple, and adding hypering overhead would do just that: add overhead. Therefore, **no** specific hypering logic has been added for this method.
 
 flatmap
 -------
 
-**status**: no specific support for the [`.flatmap`](https://docs.raku.org/type/List#method_flatmap) method has been added, as its core implementation will do the right thing on `ParaSeq` objects as well.
+No specific support for the [`.flatmap`](https://docs.raku.org/type/List#method_flatmap) method has been added, as its core implementation will do the right thing on `ParaSeq` objects as well.
 
 grep
 ----
 
-[`.grep`](https://docs.raku.org/type/List#routine_grep)
+An optimized version of the [`.grep`](https://docs.raku.org/type/List#routine_grep) method has been implemented.
+
+**Caveat**: if a `last` statement is executed, it will ensure that no further values will be delivered. However, this may not stop other threads immediately. So any other phasers, such as `ENTER`, and `LEAVE` may still get executed, even though the values that were produced, will not be delivered.
+
+**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any matcher code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.grep`.
 
 head
 ----
 
-**Status**: the [`.head`](https://docs.raku.org/type/List#method_head) method is already very simple, and adding hypering overhead would do just that: add overhead. Therefore, **no** specific hypering logic has been added for this method.
+The [`.head`](https://docs.raku.org/type/List#method_head) method is already very simple, and adding hypering overhead would do just that: add overhead. Therefore, **no** specific hypering logic has been added for this method.
 
 invert
 ------
 
-**Status**: the nature of the [`.invert`](https://docs.raku.org/type/List#routine_invert) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.invert`](https://docs.raku.org/type/List#routine_invert) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 keys
 ----
 
-**Status**: the [`.keys`](https://docs.raku.org/type/List#routine_keys) method is already very simple, and adding hypering overhead would do just that: add overhead. Therefore, **no** specific hypering logic has been added for this method.
+The [`.keys`](https://docs.raku.org/type/List#routine_keys) method is already very simple, and adding hypering overhead would do just that: add overhead. Therefore, **no** specific hypering logic has been added for this method.
 
 kv
 --
 
-**Status**: an optimized version of the [`.kv`](https://docs.raku.org/type/List#routine_kv) method has been implemented.
+An optimized version of the [`.kv`](https://docs.raku.org/type/List#routine_kv) method has been implemented.
 
 map
 ---
 
-**Status**: an optimized version of the [`.map`](https://docs.raku.org/type/List#routine_map) method has been implemented.
+An optimized version of the [`.map`](https://docs.raku.org/type/List#routine_map) method has been implemented.
 
 **Caveat**: due to a bug in Rakudo until 2024.06 release, any `FIRST` phaser will be run at the start of each batch. This can be worked around by using the [**$**, the nameless state variable](https://docs.raku.org/language/variables#The_$_variable):
 
@@ -266,84 +270,84 @@ map
 max
 ---
 
-**Status**: an optimized version of the [`.max`](https://docs.raku.org/type/Any#routine_max) method with named arguments, has been implemented.
+An optimized version of the [`.max`](https://docs.raku.org/type/Any#routine_max) method with named arguments, has been implemented.
 
 maxpairs
 --------
 
-**Status**: an optimized version of the [`.maxpairs`](https://docs.raku.org/type/Any#routine_maxpairs) method has been implemented.
+An optimized version of the [`.maxpairs`](https://docs.raku.org/type/Any#routine_maxpairs) method has been implemented.
 
 min
 ---
 
-**Status**: an optimized version of the [`.min`](https://docs.raku.org/type/Any#routine_min) method with named arguments, has been implemented.
+An optimized version of the [`.min`](https://docs.raku.org/type/Any#routine_min) method with named arguments, has been implemented.
 
 minpairs
 --------
 
-**Status**: an optimized version of the [`.minpairs`](https://docs.raku.org/type/Any#routine_minpairs) method has been implemented.
+An optimized version of the [`.minpairs`](https://docs.raku.org/type/Any#routine_minpairs) method has been implemented.
 
 nodemap
 -------
 
-**Status**: an optimized version of the [`.nodemap`](https://docs.raku.org/type/Any#method_nodemap) method has been implemented.
+An optimized version of the [`.nodemap`](https://docs.raku.org/type/Any#method_nodemap) method has been implemented.
 
 **Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
 
 pairs
 -----
 
-**Status**: an optimized version of the [`.pairs`](https://docs.raku.org/type/List#routine_pairs) method has been implemented.
+An optimized version of the [`.pairs`](https://docs.raku.org/type/List#routine_pairs) method has been implemented.
 
 pairup
 ------
 
-**Status**: the nature of the [`pairup`](https://docs.raku.org/type/Any#method_pairup) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`pairup`](https://docs.raku.org/type/Any#method_pairup) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 permutations
 ------------
 
-**Status**: the nature of the [`.permutations`](https://docs.raku.org/type/List#routine_permutations) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.permutations`](https://docs.raku.org/type/List#routine_permutations) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 pick
 ----
 
-**Status**: the nature of the [`.pick`](https://docs.raku.org/type/List#routine_pick) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.pick`](https://docs.raku.org/type/List#routine_pick) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 produce
 -------
 
-**Status**: the nature of the [`.produce`](https://docs.raku.org/type/Any#routine_produce) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.produce`](https://docs.raku.org/type/Any#routine_produce) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 repeated
 --------
 
-**Status**: the nature of the [`.repeated`](https://docs.raku.org/type/Any#method_repeated) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.repeated`](https://docs.raku.org/type/Any#method_repeated) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 reverse
 -------
 
-**Status**: the nature of the [`.reverse`](https://docs.raku.org/type/List#routine_reverse) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.reverse`](https://docs.raku.org/type/List#routine_reverse) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 roll
 ----
 
-**Status**: the nature of the [`.roll`](https://docs.raku.org/type/List#routine_roll) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.roll`](https://docs.raku.org/type/List#routine_roll) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 rotate
 ------
 
-**Status**: the nature of the [`.rotate`](https://docs.raku.org/type/List#routine_rotate) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.rotate`](https://docs.raku.org/type/List#routine_rotate) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 rotor
 -----
 
-**Status**: an optimized version of the [`.rotor`](https://docs.raku.org/type/List#routine_rotor) method has been implemented for the single argument non-`Pair` case. All other cases are basically too complicated to hyper, and therefore have no specific hypering logic.
+An optimized version of the [`.rotor`](https://docs.raku.org/type/List#routine_rotor) method has been implemented for the single argument non-`Pair` case. All other cases are basically too complicated to hyper, and therefore have no specific hypering logic.
 
 skip
 ----
 
-**Status**: the simple cases of `.skip()` and `.skip(N)` are handled by skipping that amount on the result iterator and returning the invocant.
+The simple cases of `.skip()` and `.skip(N)` are handled by skipping that amount on the result iterator and returning the invocant.
 
 The case of `.skip(*)` is handled by stopping any production of values and returning an empty `Seq`.
 
@@ -352,49 +356,49 @@ The nature of the other types of arguments on the [`.skip`](https://docs.raku.or
 slice
 -----
 
-**Status**: the nature of the [`.slice`](https://docs.raku.org/type/Seq#multi_method_slice) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.slice`](https://docs.raku.org/type/Seq#multi_method_slice) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 snip
 ----
 
-**Status**: the nature of the [`.snip`](https://docs.raku.org/type/Any#routine_snip) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.snip`](https://docs.raku.org/type/Any#routine_snip) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 snitch
 ------
 
-**Status**: since it doesn't make much sense for the [`.snitch`](https://docs.raku.org/type/Any#routine_snitch) method to be called on the `ParaSeq` object as a whole, calling the `.snitch` method instead acivates snitcher logic on the `ParaSeq` object. If set, the snitcher code will be called for each input buffer before being scheduled (in a threadsafe manner). The snitcher code will receive this buffer as a `List`.
+Since it doesn't make much sense for the [`.snitch`](https://docs.raku.org/type/Any#routine_snitch) method to be called on the `ParaSeq` object as a whole, calling the `.snitch` method instead activates snitcher logic on the `ParaSeq` object itself. If set, the snitcher code will be called for each input buffer before being scheduled (in a threadsafe manner). The snitcher code will receive this buffer as a `List`.
 
 sort
 ----
 
-**Status**: the nature of the [`.sort`](https://docs.raku.org/type/List#routine_sort) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.sort`](https://docs.raku.org/type/List#routine_sort) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 squish
 ------
 
-**Status**: an optimized version of the [`.squish`](https://docs.raku.org/type/Any#method_squish) method has been implemented.
+An optimized version of the [`.squish`](https://docs.raku.org/type/Any#method_squish) method has been implemented if either a `:as` named argument has been specified, or a `:with` named argument with something other than the `===` operator has been specified. The default case of the `.squish` method is already highly optimized so it doesn't make any sense to add any hypering logic for that case.
 
 tail
 ----
 
-**Status**: the nature of the [`.tail`](https://docs.raku.org/type/List#method_tail) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.tail`](https://docs.raku.org/type/List#method_tail) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 toggle
 ------
 
-**Status**: the nature of the [`.toggle`](https://docs.raku.org/type/Any#method_toggle) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
+The nature of the [`.toggle`](https://docs.raku.org/type/Any#method_toggle) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for this method.
 
 unique
 ------
 
-**Status**: an optimized version of the [`.unique`](https://docs.raku.org/type/Any#method_unique) method has been implemented.
+An optimized version of the [`.unique`](https://docs.raku.org/type/Any#method_unique) method has been implemented.
 
 **Caveat**: using the `:with` option with an operator that checks for **inequality**, may produce erroneous results.
 
 values
 ------
 
-**status**: the [`.values`](https://docs.raku.org/type/List#routine_values) is basically a no-op, so it returns the invocant for simplicity.
+The [`.values`](https://docs.raku.org/type/List#routine_values) is basically a no-op, so it returns the invocant for simplicity.
 
 COERCERS
 ========

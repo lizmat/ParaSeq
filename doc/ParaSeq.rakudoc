@@ -234,33 +234,33 @@ In alphabetical order:
 
 =head2 antipairs
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.antipairs>|https://docs.raku.org/type/List#routine_antipairs>
 method has been implemented.
 
 =head2 batch
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.batch>|https://docs.raku.org/type/List#method_batch> method
 has been implemented.
 
 =head2 collate
 
-B<Status>: the nature of the
-L<C<.collate>|https://docs.raku.org/type/Any#method_collate>
-method basically makes it impossible to hyper.  Therefore, B<no>
-specific hypering logic has been added for this method.
+The nature of the
+L<C<.collate>|https://docs.raku.org/type/Any#method_collate> method
+basically makes it impossible to hyper.  Therefore, B<no> specific
+hypering logic has been added for this method.
 
 =head2 combinations
 
-B<Status>: the nature of the
+The nature of the
 L<C<.combinations>|https://docs.raku.org/type/List#routine_combinations>
 method basically makes it impossible to hyper.  Therefore, B<no>
 specific hypering logic has been added for this method.
 
 =head2 deepmap
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.deepmap>|https://docs.raku.org/type/Any#method_deepmap> method
 has been implemented.
 
@@ -273,7 +273,7 @@ a hypered C<.map>.
 
 =head2 duckmap
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.duckmap>|https://docs.raku.org/type/Any#method_duckmap> method
 has been implemented.
 
@@ -292,52 +292,67 @@ is actually invoked.
 
 =head2 flat
 
-B<Status>: the L<C<.flat>|https://docs.raku.org/type/Any#method_flat>
-method is already very simple, and adding hypering overhead would do
-just that: add overhead.  Therefore, B<no> specific hypering logic has
-been added for this method.
+The L<C<.flat>|https://docs.raku.org/type/Any#method_flat> method is
+already very simple, and adding hypering overhead would do just that:
+add overhead.  Therefore, B<no> specific hypering logic has been
+added for this method.
 
 =head2 flatmap
 
-B<status>: no specific support for the
+No specific support for the
 L<C<.flatmap>|https://docs.raku.org/type/List#method_flatmap> method
 has been added, as its core implementation will do the right thing
 on C<ParaSeq> objects as well.
 
 =head2 grep
 
-L<C<.grep>|https://docs.raku.org/type/List#routine_grep>
+An optimized version of the
+L<C<.grep>|https://docs.raku.org/type/List#routine_grep> method has
+been implemented.
+
+B<Caveat>: if a C<last> statement is executed, it will ensure that
+no further values will be delivered.  However, this may not stop
+other threads immediately.  So any other phasers, such as C<ENTER>,
+and C<LEAVE> may still get executed, even though the values that
+were produced, will not be delivered.
+
+B<Caveat>: to catch any execution of C<last>, the C<ParaSeq> module
+exports its own C<last> subroutine.  This means that any matcher code
+will either have to live within the scope in which the C<use ParaSeq>
+command is executed, B<or> will need to call the fully qualified
+C<ParaSeq::last> subroutine to ensure proper C<last> handling in
+a hypered C<.grep>.
 
 =head2 head
 
-B<Status>: the L<C<.head>|https://docs.raku.org/type/List#method_head>
-method is already very simple, and adding hypering overhead would do
-just that: add overhead.  Therefore, B<no> specific hypering logic has
-been added for this method.
+The L<C<.head>|https://docs.raku.org/type/List#method_head> method is
+already very simple, and adding hypering overhead would do just that:
+add overhead.  Therefore, B<no> specific hypering logic has been
+added for this method.
 
 =head2 invert
 
-B<Status>: the nature of the
+The nature of the
 L<C<.invert>|https://docs.raku.org/type/List#routine_invert> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 keys
 
-B<Status>: the L<C<.keys>|https://docs.raku.org/type/List#routine_keys>
-method is already very simple, and adding hypering overhead would do
-just that: add overhead.  Therefore, B<no> specific hypering logic has
+The L<C<.keys>|https://docs.raku.org/type/List#routine_keys> method
+is already very simple, and adding hypering overhead would do just
+that: add overhead.  Therefore, B<no> specific hypering logic has
 been added for this method.
 
 =head2 kv
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.kv>|https://docs.raku.org/type/List#routine_kv> method has been
 implemented.
 
 =head2 map
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.map>|https://docs.raku.org/type/List#routine_map> method has been
 implemented.
 
@@ -367,31 +382,31 @@ a hypered C<.map>.
 
 =head2 max
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.max>|https://docs.raku.org/type/Any#routine_max> method with
 named arguments, has been implemented.
 
 =head2 maxpairs
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.maxpairs>|https://docs.raku.org/type/Any#routine_maxpairs> method
 has been implemented.
 
 =head2 min
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.min>|https://docs.raku.org/type/Any#routine_min> method with
 named arguments, has been implemented.
 
 =head2 minpairs
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.minpairs>|https://docs.raku.org/type/Any#routine_minpairs> method
 has been implemented.
 
 =head2 nodemap
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.nodemap>|https://docs.raku.org/type/Any#method_nodemap> method
 has been implemented.
 
@@ -404,69 +419,69 @@ a hypered C<.map>.
 
 =head2 pairs
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.pairs>|https://docs.raku.org/type/List#routine_pairs> method
 has been implemented.
 
 =head2 pairup
 
-B<Status>: the nature of the
+The nature of the
 L<C<pairup>|https://docs.raku.org/type/Any#method_pairup> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 permutations
 
-B<Status>: the nature of the
+The nature of the
 L<C<.permutations>|https://docs.raku.org/type/List#routine_permutations>
 method basically makes it impossible to hyper.  Therefore, B<no>
 specific hypering logic has been added for this method.
 
 =head2 pick
 
-B<Status>: the nature of the
+The nature of the
 L<C<.pick>|https://docs.raku.org/type/List#routine_pick> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 produce
 
-B<Status>: the nature of the
+The nature of the
 L<C<.produce>|https://docs.raku.org/type/Any#routine_produce> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 repeated
 
-B<Status>: the nature of the
+The nature of the
 L<C<.repeated>|https://docs.raku.org/type/Any#method_repeated> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 reverse
 
-B<Status>: the nature of the
+The nature of the
 L<C<.reverse>|https://docs.raku.org/type/List#routine_reverse> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 roll
 
-B<Status>: the nature of the
+The nature of the
 L<C<.roll>|https://docs.raku.org/type/List#routine_roll> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 rotate
 
-B<Status>: the nature of the
+The nature of the
 L<C<.rotate>|https://docs.raku.org/type/List#routine_rotate> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 rotor
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.rotor>|https://docs.raku.org/type/List#routine_rotor> method
 has been implemented for the single argument non-C<Pair> case.  All
 other cases are basically too complicated to hyper, and therefore
@@ -474,9 +489,9 @@ have no specific hypering logic.
 
 =head2 skip
 
-B<Status>: the simple cases of C<.skip()> and C<.skip(N)> are
-handled by skipping that amount on the result iterator and returning
-the invocant.
+The simple cases of C<.skip()> and C<.skip(N)> are handled by
+skipping that amount on the result iterator and returning the
+invocant.
 
 The case of C<.skip(*)> is handled by stopping any production of
 values and returning an empty C<Seq>.
@@ -488,58 +503,62 @@ hypering logic has been added for these cases.
 
 =head2 slice
 
-B<Status>: the nature of the
+The nature of the
 L<C<.slice>|https://docs.raku.org/type/Seq#multi_method_slice>
 method basically makes it impossible to hyper.  Therefore, B<no>
 specific hypering logic has been added for this method.
 
 =head2 snip
 
-B<Status>: the nature of the
+The nature of the
 L<C<.snip>|https://docs.raku.org/type/Any#routine_snip> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 snitch
 
-B<Status>: since it doesn't make much sense for the
+Since it doesn't make much sense for the
 L<C<.snitch>|https://docs.raku.org/type/Any#routine_snitch> method
 to be called on the C<ParaSeq> object as a whole, calling the
-C<.snitch> method instead acivates snitcher logic on the
-C<ParaSeq> object.  If set, the snitcher code will be called
+C<.snitch> method instead activates snitcher logic on the
+C<ParaSeq> object itself.  If set, the snitcher code will be called
 for each input buffer before being scheduled (in a threadsafe
 manner).  The snitcher code will receive this buffer as a C<List>.
 
 =head2 sort
 
-B<Status>: the nature of the
+The nature of the
 L<C<.sort>|https://docs.raku.org/type/List#routine_sort> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 squish
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.squish>|https://docs.raku.org/type/Any#method_squish> method
-has been implemented.
+has been implemented if either a C<:as> named argument has been
+specified, or a C<:with> named argument with something other than
+the C<===> operator has been specified.  The default case of the
+C<.squish> method is already highly optimized so it doesn't make
+any sense to add any hypering logic for that case.
 
 =head2 tail
 
-B<Status>: the nature of the
+The nature of the
 L<C<.tail>|https://docs.raku.org/type/List#method_tail> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 toggle
 
-B<Status>: the nature of the
+The nature of the
 L<C<.toggle>|https://docs.raku.org/type/Any#method_toggle> method
 basically makes it impossible to hyper.  Therefore, B<no> specific
 hypering logic has been added for this method.
 
 =head2 unique
 
-B<Status>: an optimized version of the
+An optimized version of the
 L<C<.unique>|https://docs.raku.org/type/Any#method_unique> method
 has been implemented.
 
@@ -548,8 +567,7 @@ B<inequality>, may produce erroneous results.
 
 =head2 values
 
-B<status>: the
-L<C<.values>|https://docs.raku.org/type/List#routine_values> is
+The L<C<.values>|https://docs.raku.org/type/List#routine_values> is
 basically a no-op, so it returns the invocant for simplicity.
 
 =head1 COERCERS
