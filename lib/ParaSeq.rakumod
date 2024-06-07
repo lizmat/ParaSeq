@@ -808,7 +808,6 @@ class ParaSeq does Sequence {
             my $snitcher := $!snitcher;
 
             my uint $ordinal; # ordinal number of batch
-            my  int $needed;  # number of values to still fetch
 
             # flag: 1 if exhausted
             my uint $exhausted =
@@ -821,17 +820,18 @@ class ParaSeq does Sequence {
 
             # Until the source iterator is exhausted or we're halted
             until $exhausted || nqp::atomicload_i($!stop) {
-                # Wait for ok to proceed
-                $needed = granulize(nqp::shift($pressure)) - 1;
-
-die "needed = $needed" if $needed < 0;
 
                 # Setup buffer with initial value
                 nqp::push((my $buffer := nqp::create(IB)),$initial);
 
-                # Fetch any additional values needed and set flag
-                $exhausted =
-                  nqp::eqaddr($source.push-exactly($buffer,$needed),IE);
+                # Wait for ok to proceed
+                if granulize(nqp::shift($pressure)) -> uint $needed {
+
+                    # Fetch any additional values needed and set flag
+                    $exhausted = nqp::eqaddr(
+                      $source.push-exactly($buffer,$needed - 1),IE
+                    );
+                }
 
                 # If not already exhausted attempt to get one value more
                 $exhausted = nqp::eqaddr(($initial := $source.pull-one),IE)
