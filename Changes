@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.1.2  2024-06-08T13:03:48+02:00
     - Reverted temporary fix
     - Sadly needed to remove the "call Paraseq::last" instead of
       imported "last" due to some as yet not understood interaction
