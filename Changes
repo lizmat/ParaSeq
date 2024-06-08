@@ -2,6 +2,9 @@ Revision history for ParaSeq
 
 {{$NEXT}}
 
+0.1.1  2024-06-08T12:14:22+02:00
+    - Temporary fix for inclusion in precomped modules
+
 0.1.0  2024-06-07T21:36:23+02:00
     - Updated status of ".squish" and added tests
     - Fixed an edge case in the slow batcher
