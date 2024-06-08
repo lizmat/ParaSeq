@@ -735,12 +735,14 @@ class ParaSeq does Sequence {
 
         # Local copy of first buffer, make sure it is granulized correctly
         my $first := $!buffer;
-        $!buffer  := Mu;  # release buffer in object
-        nqp::until(
-          nqp::elems($first) %% $granularity
-            || nqp::eqaddr((my $pulled := $!source.pull-one),IE),
-          nqp::push($first,$pulled)
-        );
+        if nqp::isconcrete($!buffer) {
+            $!buffer  := Mu;  # release buffer in object
+            nqp::until(
+              nqp::elems($first) %% $granularity
+                || nqp::eqaddr((my $pulled := $!source.pull-one),IE),
+              nqp::push($first,$pulled)
+            );
+        }
 
         # Batch size allowed to vary, so set up back pressure queue
         # with some simple variation
@@ -778,8 +780,10 @@ class ParaSeq does Sequence {
 
             # Queue the first buffer we already filled, and set up the
             # result iterator
-            $snitcher($first) unless nqp::isnull($snitcher);
-            processor($ordinal, $first, $result.semaphore);
+            if nqp::isconcrete($first) {
+                $snitcher($first) unless nqp::isnull($snitcher);
+                processor($ordinal, $first, $result.semaphore);
+            }
 
             # Until we're halted or have a buffer that's not full
             nqp::until(
@@ -826,8 +830,10 @@ class ParaSeq does Sequence {
 
             # Queue the first buffer we already filled, and set up the
             # result iterator
-            $snitcher($first) unless nqp::isnull($snitcher);
-            processor($ordinal, $exhausted, $first, $result.semaphore);
+            if nqp::isconcrete($first) {
+                $snitcher($first) unless nqp::isnull($snitcher);
+                processor($ordinal, $exhausted, $first, $result.semaphore);
+            }
 
             # Until the source iterator is exhausted or we're halted
             until $exhausted || nqp::atomicload_i($!stop) {
