@@ -1,6 +1,10 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+    - Reverted temporary fix
+    - Sadly needed to remove the "call Paraseq::last" instead of
+      imported "last" due to some as yet not understood interaction
+      between "uint" and "our"
 
 0.1.1  2024-06-08T12:14:22+02:00
     - Temporary fix for inclusion in precomped modules

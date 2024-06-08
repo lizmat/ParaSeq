@@ -207,14 +207,14 @@ deepmap
 
 An optimized version of the [`.deepmap`](https://docs.raku.org/type/Any#method_deepmap) method has been implemented.
 
-**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
+**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, to ensure proper `last` handling in a hypered `.deepmap`.
 
 duckmap
 -------
 
 An optimized version of the [`.duckmap`](https://docs.raku.org/type/Any#method_duckmap) method has been implemented.
 
-**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
+**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, to ensure proper `last` handling in a hypered `.duckmap`.
 
 **Caveat**: due to the way `duckmap` was implemented before the `2024.06` release of Rakudo, the `LEAVE` phaser would get called for every value attempted. This has since been fixed, so that the `ENTER` and `LEAVE` phasers are only called if the `Callable` is actually invoked.
 
@@ -235,7 +235,7 @@ An optimized version of the [`.grep`](https://docs.raku.org/type/List#routine_gr
 
 **Caveat**: if a `last` statement is executed, it will ensure that no further values will be delivered. However, this may not stop other threads immediately. So any other phasers, such as `ENTER`, and `LEAVE` may still get executed, even though the values that were produced, will not be delivered.
 
-**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any matcher code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.grep`.
+**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any matcher code will either have to live within the scope in which the `use ParaSeq` command is executed, to ensure proper `last` handling in a hypered `.grep`.
 
 head
 ----
@@ -270,7 +270,7 @@ An optimized version of the [`.map`](https://docs.raku.org/type/List#routine_map
 
 **Caveat**: if a `last` statement is executed, it will ensure that no further values will be delivered. However, this may not stop other threads immediately. So any other phasers, such as `ENTER`, `LEAVE` and `NEXT` may still get executed, even though the values that were produced, will not be delivered.
 
-**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
+**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, to ensure proper `last` handling in a hypered `.map`.
 
 max
 ---
@@ -297,7 +297,7 @@ nodemap
 
 An optimized version of the [`.nodemap`](https://docs.raku.org/type/Any#method_nodemap) method has been implemented.
 
-**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, **or** will need to call the fully qualified `ParaSeq::last` subroutine to ensure proper `last` handling in a hypered `.map`.
+**Caveat**: to catch any execution of `last`, the `ParaSeq` module exports its own `last` subroutine. This means that any mapper code will either have to live within the scope in which the `use ParaSeq` command is executed, to ensure proper `last` handling in a hypered `.nodemap`.
 
 pairs
 -----
