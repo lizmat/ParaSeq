@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 24;
+plan 32;
 
 my constant $elems    = 200000;
 my constant $list     = (^$elems).pick(*).List;
@@ -13,6 +13,16 @@ my constant $same     = (1 xx $elems).List;
 my constant $one      = $same.squish.List;
 
 for 1, ParaSeq.default-degree {
+    my $seq := $list.&hyperize($batch, $_).squish;
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $squish,
+      "list.squish with degree = $_";
+
+    $seq := $same.&hyperize($batch, $_).squish;
+    isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
+    is-deeply $seq.List, $one,
+      "same.squish with degree = $_";
+
     for &[===], &[==] -> $with {
         my $seq := $list.&hyperize($batch, $_).squish(:$with);
         isa-ok $seq, $_ == 1 ?? Seq !! ParaSeq;
