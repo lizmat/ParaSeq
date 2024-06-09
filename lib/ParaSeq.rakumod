@@ -698,14 +698,6 @@ class ParaSeq does Sequence {
            $buffer is raw,
            $source
     ) is hidden-from-backtrace {
-        X::Invalid::Value.new(
-          :method<hyperize>, :name<batch>,  :value($batch)
-        ).throw if $batch <= 0;
-        X::Invalid::Value.new(
-          :method<hyperize>, :name<degree>, :value($degree)
-        ).throw if $degree <= 1;
-
-        # Set it up!
         my $self := nqp::create(self);
         nqp::bindattr_i($self, ParaSeq, '$!batch',      $batch     );
         nqp::bindattr_i($self, ParaSeq, '$!auto',       $auto      );
@@ -945,31 +937,6 @@ class ParaSeq does Sequence {
     multi method snitch(ParaSeq:D: &snitcher = &note) {
         $!snitcher := &snitcher;
         self
-    }
-
-#- entry points ----------------------------------------------------------------
-
-    # Entry point from the subs: made as small as possible so that the
-    # fast path for iterators that don't produce enough values to warrant
-    # paralellization, will quickly continue as if nothing happenend
-    method parent(
-           $source,
-      uint $initial,
-      uint $auto,
-      uint $degree,
-      uint $stop-after
-    ) is implementation-detail {
-        my $iterator := $source.iterator;
-        my $buffer   := nqp::create(IB);
-
-        nqp::eqaddr($iterator.push-exactly($buffer, $initial),IE)
-          # First batch already exhausted iterator, so work with buffer
-          ?? $buffer.Seq
-          # Need to actually parallelize, set up ParaSeq object
-          !! self!setup(
-               $initial, $auto, $degree, $stop-after,
-               $buffer, $iterator
-             )
     }
 
 #- where all the magic happens under the hood ----------------------------------
@@ -2141,43 +2108,58 @@ class ParaSeq does Sequence {
     multi method Slip(   ParaSeq:D:) { self.IterationBuffer.Slip }
     multi method Str(    ParaSeq:D:) { self.join(" ")            }
     multi method Supply( ParaSeq:D:) { self.List.Supply          }
+
+#- hyperize --------------------------------------------------------------------
+    proto method hyperize(|) {*}
+    multi method hyperize(ParaSeq:U:
+      \iterable,
+      $batch      is copy,
+      $auto       is copy,
+      $degree     is copy,
+      $stop-after is copy
+    ) is implementation-detail {
+        $batch := ($batch // $default-batch).Int;
+        X::Invalid::Value.new(
+          :method<hyperize>, :name<batch>,  :value($batch)
+        ).throw if $batch <= 0;
+
+        $degree := ($degree // $default-degree).Int;
+        X::Invalid::Value.new(
+          :method<hyperize>, :name<degree>, :value($degree)
+        ).throw if $degree <= 1;
+
+        my $iterator := iterable.iterator;
+        my $buffer   := nqp::create(IB);
+
+        # First batch already exhausted iterator, so work with buffer in
+        # a non-parallelized way
+        if nqp::eqaddr($iterator.push-exactly($buffer, $batch),IE) {
+            $buffer.Seq
+        }
+
+        # Need to actually parallelize, set up ParaSeq object
+        else {
+            $auto       := ($auto // True).Bool;
+            $stop-after := ($stop-after // Inf) == Inf ?? 0 !! $stop-after.Int;
+            self!setup(
+              $batch, $auto, $degree, $stop-after,
+              $buffer, $iterator
+            )
+        }
+    }
 }
 
 #- actual interface ------------------------------------------------------------
 
 proto sub hyperize(|) is export {*}
 multi sub hyperize(\iterable, $, 1, *%_) is raw { iterable }
-multi sub hyperize(
-         \iterable,
-        $batch?,
-        $degree?,
-  Bool :$auto       = True,
-       :$stop-after = Inf,
-) {
-    ParaSeq.parent(
-      iterable,
-      ($batch // $default-batch).Int,
-      $auto,
-      ($degree // $default-degree).Int,
-      $stop-after == Inf ?? 0 !! $stop-after,
-    )
+multi sub hyperize(\iterable, $batch?, $degree?, :$auto, :$stop-after) {
+    ParaSeq.hyperize(iterable, $batch, $auto, $degree, $stop-after)
 }
-multi sub hyperize(
-  List:D $list,
-         $size?,
-         $degree?,
-  Bool  :$auto       = True,
-        :$stop-after = Inf,
-) {
+multi sub hyperize(List:D $list, $size?, $degree?, :$auto, :$stop-after) {
     my uint $batch = $size // $default-batch;
     $list.is-lazy || $list.elems > $batch
-      ?? ParaSeq.parent(
-           $list,
-           ($batch // $default-batch).Int,
-           $auto,
-           ($degree // $default-degree).Int,
-           $stop-after == Inf ?? 0 !! $stop-after
-         )
+      ?? ParaSeq.hyperize($list, $batch, $auto, $degree, $stop-after)
       !! $list
 }
 
