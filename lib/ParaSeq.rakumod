@@ -2109,7 +2109,7 @@ class ParaSeq does Sequence {
     multi method Str(    ParaSeq:D:) { self.join(" ")            }
     multi method Supply( ParaSeq:D:) { self.List.Supply          }
 
-#- hyperize --------------------------------------------------------------------
+#- hyper -----------------------------------------------------------------------
     proto method hyper(|) {*}
 
     # If the degree is 1, then just return the iterable, nothing to parallelize
@@ -2129,12 +2129,12 @@ class ParaSeq does Sequence {
     ) is implementation-detail {
         $batch := ($batch // $default-batch).Int;
         X::Invalid::Value.new(
-          :method<hyperize>, :name<batch>,  :value($batch)
+          :method<hyper>, :name<batch>,  :value($batch)
         ).throw if $batch <= 0;
 
         $degree := ($degree // $default-degree).Int;
         X::Invalid::Value.new(
-          :method<hyperize>, :name<degree>, :value($degree)
+          :method<hyper>, :name<degree>, :value($degree)
         ).throw if $degree <= 1;
 
         my $iterator := iterable.iterator;
@@ -2160,8 +2160,8 @@ class ParaSeq does Sequence {
     # Change hypering settings along the way
     multi method hyper(ParaSeq:D: $batch?, $degree?, :$auto, :$stop-after) {
         $degree && $degree == 1
-          ?? self.serial        # re-hypering with degree == 1 -> serialize
-          !! ParaSeq.hyperize(  # restart, taking over defaults
+          ?? self.serial     # re-hypering with degree == 1 -> serialize
+          !! ParaSeq.hyper(  # restart, taking over defaults
                self,
                $batch      // $!batch,
                $auto       // $!auto,
