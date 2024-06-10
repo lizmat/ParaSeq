@@ -2110,8 +2110,17 @@ class ParaSeq does Sequence {
     multi method Supply( ParaSeq:D:) { self.List.Supply          }
 
 #- hyperize --------------------------------------------------------------------
-    proto method hyperize(|) {*}
-    multi method hyperize(ParaSeq:U:
+    proto method hyper(|) {*}
+
+    # If the degree is 1, then just return the iterable, nothing to parallelize
+    multi method hyper(ParaSeq:
+      \iterable, $, $, 1, $
+    ) is implementation-detail {
+        iterable
+    }
+
+    # Entry point from the subs
+    multi method hyper(ParaSeq:U:
       \iterable,
       $batch      is copy,
       $auto       is copy,
@@ -2147,19 +2156,31 @@ class ParaSeq does Sequence {
             )
         }
     }
+
+    # Change hypering settings along the way
+    multi method hyper(ParaSeq:D: $batch?, $degree?, :$auto, :$stop-after) {
+        $degree && $degree == 1
+          ?? self.serial        # re-hypering with degree == 1 -> serialize
+          !! ParaSeq.hyperize(  # restart, taking over defaults
+               self,
+               $batch      // $!batch,
+               $auto       // $!auto,
+               $degree     // $!degree,
+               $stop-after // $!stop-after
+             )
+    }
 }
 
 #- actual interface ------------------------------------------------------------
 
 proto sub hyperize(|) is export {*}
-multi sub hyperize(\iterable, $, 1, *%_) is raw { iterable }
 multi sub hyperize(\iterable, $batch?, $degree?, :$auto, :$stop-after) {
-    ParaSeq.hyperize(iterable, $batch, $auto, $degree, $stop-after)
+    ParaSeq.hyper(iterable, $batch, $auto, $degree, $stop-after)
 }
 multi sub hyperize(List:D $list, $size?, $degree?, :$auto, :$stop-after) {
     my uint $batch = $size // $default-batch;
     $list.is-lazy || $list.elems > $batch
-      ?? ParaSeq.hyperize($list, $batch, $auto, $degree, $stop-after)
+      ?? ParaSeq.hyper($list, $batch, $auto, $degree, $stop-after)
       !! $list
 }
 
