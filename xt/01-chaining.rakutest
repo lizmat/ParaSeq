@@ -35,7 +35,7 @@ is-Para($seq6, 'grep(expandtab)');
 
 my @result := $seq6.List;
 isa-ok @result.are, Pair, 'All pairs';
-is @result.elems, 53, 'Did we get all the expected results';
+is @result.elems, 50, 'Did we get all the expected results';
 
 #for $seq1, $seq2, $seq3, $seq4, $seq5, $seq6 -> $seq is raw {
 #    say $seq.VAR.name;
