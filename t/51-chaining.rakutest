@@ -1,0 +1,46 @@
+use Test;
+use paths;
+use path-utils;
+use ParaSeq;
+
+plan 8;
+
+sub is-Para($seq, str $tag) is test-assertion {
+    subtest "$tag: check ParaSeq" => {
+        plan 4;
+        isa-ok $seq, ParaSeq;
+        is $seq.stats.elems, 0, "$tag: nothing happened yet";
+        is-deeply $seq.auto, True, 'auto is set';
+        is-deeply $seq.stop-after, False, 'stop-afer is NOT set';
+    }
+}
+
+my $seq1 = paths($*PROGRAM.parent(2).add("t")).&hyperize(16);
+is-Para($seq1, 'hyperize');
+
+my $seq2 = $seq1.sort;
+is-Para($seq2, 'sort');
+
+my $seq3 = $seq2.grep(&path-is-text);
+is-Para($seq3, 'grep(is-text)');
+
+my $seq4 = $seq3.map(*.IO.lines.Slip);
+is-Para($seq4, 'lines');
+
+my $seq5 = $seq4.pairs;
+is-Para($seq5, 'pairs');
+
+my $seq6 = $seq5.grep(*.value.contains("expandtab"));
+is-Para($seq6, 'grep(expandtab)');
+
+my @result := $seq6.List;
+isa-ok @result.are, Pair, 'All pairs';
+is @result.elems, 53, 'Did we get all the expected results';
+
+#for $seq1, $seq2, $seq3, $seq4, $seq5, $seq6 -> $seq is raw {
+#    say $seq.VAR.name;
+#    say "processed: $seq.processed(), produced: $seq.produced()";
+#    .say for $seq.stats;
+#}
+
+# vim: expandtab shiftwidth=4

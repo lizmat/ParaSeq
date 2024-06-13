@@ -501,31 +501,13 @@ my class ParaIterator does Iterator {
 
         # At least one further batch ready to be delivered
         else {
-
-            # Fetch statistics of batches that have been produced until now
-            my uint $processed = $!processed;
-            my uint $produced  = $!produced;
-            my uint $nsecs     = $!nsecs;
-            nqp::until(
-              nqp::isnull(nqp::atpos($!waiting,0)),
-              nqp::stmts(
-                nqp::push($!stats,my $stats := nqp::shift($!waiting)),
-                ($processed = nqp::add_i($processed,$stats.processed)),
-                ($produced  = nqp::add_i($produced, $stats.produced )),
-                ($nsecs     = nqp::add_i($nsecs,    $stats.nsecs    ))
-              )
-            );
-
-            # Update total statistics
-            $!processed = $processed;
-            $!produced  = $produced;
-            $!nsecs     = $nsecs;
+            self!update-stats;
 
             # Update batch size
             if $!auto {
                 $!batch =
-                  nqp::div_i(nqp::mul_i($processed,$target-nsecs),$nsecs)
-                  if $nsecs;
+                  nqp::div_i(nqp::mul_i($!processed,$target-nsecs),$!nsecs)
+                  if $!nsecs;
             }
 
             # Initiate more work with updated batch size
@@ -533,6 +515,28 @@ my class ParaIterator does Iterator {
         }
 
         $buffer
+    }
+
+    # Update statistics from the waiting queue
+    method !update-stats() {
+        # Fetch statistics of batches that have been produced until now
+        my uint $processed = $!processed;
+        my uint $produced  = $!produced;
+        my uint $nsecs     = $!nsecs;
+        nqp::until(
+          nqp::isnull(nqp::atpos($!waiting,0)),
+          nqp::stmts(
+            nqp::push($!stats,my $stats := nqp::shift($!waiting)),
+            ($processed = nqp::add_i($processed,$stats.processed)),
+            ($produced  = nqp::add_i($produced, $stats.produced )),
+            ($nsecs     = nqp::add_i($nsecs,    $stats.nsecs    ))
+          )
+        );
+
+        # Update total statistics
+        $!processed = $processed;
+        $!produced  = $produced;
+        $!nsecs     = $nsecs;
     }
 
     method pull-one(ParaIterator:D:) {
@@ -624,7 +628,10 @@ my class ParaIterator does Iterator {
         nqp::push($!queues,IE)
     }
 
-    method stats(ParaIterator:D:) is implementation-detail { $!stats }
+    method stats(ParaIterator:D:) is implementation-detail {
+        self!update-stats;
+        $!stats
+    }
 
     method set-lastsema($lastsema is raw) { $!lastsema := $lastsema }
 
@@ -892,11 +899,28 @@ class ParaSeq does Sequence {
         self
     }
 
-    # Change the source of this ParaSeq (and reset the result iterator)
+    # If there was no result iterator yet, return invocant: can still use
+    # this object.  If there was, clone the invocant and make the result
+    # iterator the source for the clone.
+    method !re-shape() {
+        if nqp::isnull($!result) {
+            self
+        }
+        else {
+            my $self := nqp::clone(self);
+            nqp::bindattr($self,ParaSeq,'$!source',$!result);
+            nqp::bindattr($self,ParaSeq,'$!result',nqp::null);
+            $self
+        }
+    }
+
+    # Create a clone of the invocant, set the given iterator as source and
+    # reset the result iterator
     method !re-source($source is raw) {
-        $!source := $source;
-        $!result := nqp::null;
-        self
+        my $self := nqp::clone(self);
+        nqp::bindattr($self,ParaSeq,'$!source',$source);
+        nqp::bindattr($self,ParaSeq,'$!result',nqp::null);
+        $self
     }
 
     # Mark the given queue as done
@@ -963,7 +987,9 @@ class ParaSeq does Sequence {
 
 #- introspection ---------------------------------------------------------------
 
-    method auto(ParaSeq:D:) { nqp::hllbool($!auto) }
+    proto method auto(|) {*}
+    multi method auto(ParaSeq:D:             ) { nqp::hllbool($!auto) }
+    multi method auto(ParaSeq:D: Bool() $auto) { $!auto = $auto       }
 
     method batch-sizes(ParaSeq:D:) {
         self.stats.map(*.processed).minmax
@@ -982,9 +1008,18 @@ class ParaSeq does Sequence {
         nqp::hllbool($!source.is-monotonically-increasing)
     }
 
-    method stats( ParaSeq:D:) { $!result.stats.List }
+    method stats(ParaSeq:D:) {
+        nqp::isnull($!result) ?? () !! $!result.stats.List
+    }
 
-    method stop-after(ParaSeq:D:) { $!stop-after || False }
+    method processed(ParaSeq:D:) { self.stats.map(*.processed).sum }
+    method produced(ParaSeq:D:)  { self.stats.map(*.produced).sum  }
+
+    proto method stop-after(|) {*}
+    multi method stop-after(ParaSeq:D:) { $!stop-after || False }
+    multi method stop-after(ParaSeq:D: Int() $stop-after) {
+        $!stop-after = $stop-after > 0 ?? $stop-after !! 0
+    }
 
     method stopped(ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
 
@@ -1188,7 +1223,7 @@ class ParaSeq does Sequence {
         }
 
         # Let's go!
-        self!start(&processor)
+        self!re-shape!start(&processor)
     }
 
 #- batch -----------------------------------------------------------------------
@@ -1227,7 +1262,7 @@ class ParaSeq does Sequence {
         }
 
         # Let's go!
-        self!start(&processor, $size)
+        self!re-shape!start(&processor, $size)
     }
 
     proto method batch(|) {*}
@@ -1324,7 +1359,7 @@ class ParaSeq does Sequence {
             }
 
             # Let's go using the slower path
-            self!start(&processor, $granularity, :slow)
+            self!re-shape!start(&processor, $granularity, :slow)
         }       
 
         # Use standard "map-like" handling
@@ -1411,7 +1446,7 @@ class ParaSeq does Sequence {
         }
 
         # Let's go!
-        self!start(
+        self!re-shape!start(
           $k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v,
           granularity($matcher),
           :slow
@@ -1496,7 +1531,7 @@ class ParaSeq does Sequence {
         }
 
         # Let's go!
-        self!start($k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v)
+        self!re-shape!start($k ?? &k !! $kv ?? &kv !! $p ?? &p !! &v)
     }
 
 #- kv --------------------------------------------------------------------------
@@ -1530,7 +1565,7 @@ class ParaSeq does Sequence {
         }
 
         # Let's go!
-        self!start(&processor)
+        self!re-shape!start(&processor)
     }
 
 #- map -------------------------------------------------------------------------
@@ -1563,7 +1598,7 @@ class ParaSeq does Sequence {
         }
 
         # Let's go using the slower path
-        self!start(&processor, $granularity, :slow)
+        self!re-shape!start(&processor, $granularity, :slow)
     }
 
     # Handling Callables that cannot have phasers
@@ -1583,7 +1618,7 @@ class ParaSeq does Sequence {
         }
 
         # Let's go!
-        self!start(&processor, granularity($mapper))
+        self!re-shape!start(&processor, granularity($mapper))
     }
 
     multi method map(ParaSeq:D: Block:D $mapper) {
@@ -1774,7 +1809,7 @@ class ParaSeq does Sequence {
         }
 
         # Let's go!
-        self!start(&processor)
+        self!re-shape!start(&processor)
     }
 
 #- squish ----------------------------------------------------------------------
