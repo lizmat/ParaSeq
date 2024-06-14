@@ -1013,12 +1013,13 @@ class ParaSeq does Sequence {
     }
 
     method processed(ParaSeq:D:) { self.stats.map(*.processed).sum }
-    method produced(ParaSeq:D:)  { self.stats.map(*.produced).sum  }
+    method produced(ParaSeq:D:)  { self.stats.map(*.produced ).sum }
 
     proto method stop-after(|) {*}
     multi method stop-after(ParaSeq:D:) { $!stop-after || False }
     multi method stop-after(ParaSeq:D: Int() $stop-after) {
-        $!stop-after = $stop-after > 0 ?? $stop-after !! 0
+        $!stop-after = $stop-after > 0 ?? $stop-after !! 0;
+        self
     }
 
     method stopped(ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }

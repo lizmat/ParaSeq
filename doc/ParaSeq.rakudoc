@@ -727,6 +727,9 @@ debugginng.  In alphabetical order:
 Bool.  Returns whether batch sizes will be automatically optimized to
 provide the best throughput.
 
+Can also be called as a mutator if a C<Bool> value is specified.  In
+that case, returns the invocant for easier chaining.
+
 =head3 batch-sizes
 
 Range.  The smallest and largest batch size as a C<Range>.
@@ -740,22 +743,40 @@ Int.  The default initial batch size: currently C<16>.
 Int.  The default maximum number of worker threads to be used.  Currently
 set to the number of available CPUs minus one.
 
+=head3 hyper
+
+Change hypering settings on invocant and returns invocant.  Takes the
+same arguments as C<&hyperize>.
+
 =head3 is-lazy
 
 Bool.  Returns whether the C<ParaSeq> iterator should be considered lazy
 or not.  It will be considered lazy if the source iterator is lazy and
 B<no> value has been specified with C<:stop-after>.
 
+=head3 processed
+
+Int.  The number of items processed, as obtained from the C<stats>.
+
+=head3 produced
+
+Int.  The number of items produced, as obtained from the C<stats>.
+
 =head3 stats
 
 A C<List> of C<ParaStats> objects that were produced, in the order that
-they were produced.
+they were produced.  Note that due to the asynchronous nature of stats
+production and processing, this may be incomplete at any given time.
 
 =head3 stop-after
 
 Int or False.  Returns C<False> if there is B<no limit> on the number of
 values that can be delivered.  Otherwise returns the maximum number of
 values that will be delivered.
+
+Can also be called as a mutator if an C<Int> value is specified (or
+C<False> to inhibit any resul constraint).  When used as a mutator,
+Returns the invocant for easier chaining.
 
 =head3 stopped
 

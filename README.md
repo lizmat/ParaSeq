@@ -532,6 +532,8 @@ Can be used in any situation where a `Seq` could also be used. The following add
 
 Bool. Returns whether batch sizes will be automatically optimized to provide the best throughput.
 
+Can also be called as a mutator if a `Bool` value is specified. In that case, returns the invocant for easier chaining.
+
 ### batch-sizes
 
 Range. The smallest and largest batch size as a `Range`.
@@ -544,17 +546,31 @@ Int. The default initial batch size: currently `16`.
 
 Int. The default maximum number of worker threads to be used. Currently set to the number of available CPUs minus one.
 
+### hyper
+
+Change hypering settings on invocant and returns invocant. Takes the same arguments as `&hyperize`.
+
 ### is-lazy
 
 Bool. Returns whether the `ParaSeq` iterator should be considered lazy or not. It will be considered lazy if the source iterator is lazy and **no** value has been specified with `:stop-after`.
 
+### processed
+
+Int. The number of items processed, as obtained from the `stats`.
+
+### produced
+
+Int. The number of items produced, as obtained from the `stats`.
+
 ### stats
 
-A `List` of `ParaStats` objects that were produced, in the order that they were produced.
+A `List` of `ParaStats` objects that were produced, in the order that they were produced. Note that due to the asynchronous nature of stats production and processing, this may be incomplete at any given time.
 
 ### stop-after
 
 Int or False. Returns `False` if there is **no limit** on the number of values that can be delivered. Otherwise returns the maximum number of values that will be delivered.
+
+Can also be called as a mutator if an `Int` value is specified (or `False` to inhibit any resul constraint). When used as a mutator, Returns the invocant for easier chaining.
 
 ### stopped
 

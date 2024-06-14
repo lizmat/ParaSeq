@@ -3,44 +3,49 @@ use paths;
 use path-utils;
 use ParaSeq;
 
-plan 8;
+plan 9;
 
-sub is-Para($seq, str $tag) is test-assertion {
+my uint $stop-after = 1000;
+
+sub is-Para($seq, str $tag, :$stop-after = False) is test-assertion {
     subtest "$tag: check ParaSeq" => {
         plan 4;
         isa-ok $seq, ParaSeq;
         is $seq.stats.elems, 0, "$tag: nothing happened yet";
         is-deeply $seq.auto, True, 'auto is set';
-        is-deeply $seq.stop-after, False, 'stop-afer is NOT set';
+        is-deeply $seq.stop-after, $stop-after, 'stop-afer is NOT set';
     }
 }
 
-my $seq1 = paths($*PROGRAM.parent(2).add("t")).&hyperize(16);
+my $seq1 = paths($*PROGRAM.parent(2).add("t")).&hyperize;
 is-Para($seq1, 'hyperize');
 
-my $seq2 = $seq1.sort;
-is-Para($seq2, 'sort');
+my $seq2 = $seq1.map({ ($_ xx 100).Slip });
+is-Para($seq1, 'xx 100');
 
-my $seq3 = $seq2.grep(&path-is-text);
-is-Para($seq3, 'grep(is-text)');
+my $seq3 = $seq2.sort;
+is-Para($seq3, 'sort');
 
-my $seq4 = $seq3.map(*.IO.lines.Slip);
-is-Para($seq4, 'lines');
+my $seq4 = $seq3.grep(&path-is-text);
+is-Para($seq4, 'grep(is-text)');
 
-my $seq5 = $seq4.pairs;
-is-Para($seq5, 'pairs');
+my $seq5 = $seq4.map(*.IO.lines.Slip);
+is-Para($seq5, 'lines');
 
-my $seq6 = $seq5.grep(*.value.contains("expandtab"));
-is-Para($seq6, 'grep(expandtab)');
+my $seq6 = $seq5.pairs;
+is-Para($seq6, 'pairs');
 
-my @result := $seq6.List;
+my $seq7 = $seq6.stop-after($stop-after).grep(*.value.contains("expandtab"));
+is-Para($seq7, 'grep(expandtab)', :$stop-after);
+
+my @result := $seq7.List;
 isa-ok @result.are, Pair, 'All pairs';
-is @result.elems, 50, 'Did we get all the expected results';
+is @result.elems, $stop-after, 'Did we get all the expected results';
 
-#for $seq1, $seq2, $seq3, $seq4, $seq5, $seq6 -> $seq is raw {
+#for $seq1, $seq2, $seq3, $seq4, $seq5, $seq6, $seq7 -> $seq is raw {
 #    say $seq.VAR.name;
 #    say "processed: $seq.processed(), produced: $seq.produced()";
-#    .say for $seq.stats;
+#    .say for $seq.stats.head(20);
 #}
 
 # vim: expandtab shiftwidth=4
