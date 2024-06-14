@@ -2,6 +2,11 @@ Revision history for ParaSeq
 
 {{$NEXT}}
 
+0.2.0  2024-06-14T13:14:48+02:00
+    - Re-imagined infectiousness which makes chaining methods
+      acually work reliably
+    - Added tests for chaining several API methods
+
 0.1.2  2024-06-08T13:03:48+02:00
     - Reverted temporary fix
     - Sadly needed to remove the "call Paraseq::last" instead of
