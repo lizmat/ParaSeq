@@ -429,7 +429,6 @@ my class ParaIterator does Iterator {
     has uint      $!processed;  # number of items processed so far
     has uint      $!produced;   # number of items produced so far
     has uint      $!nsecs;      # nano seconds wallclock used so far
-    has uint      $!todo;       # number of items left to deliver
     has           $!lastsema;   # the last semaphore that should be processed
     has atomicint $!stop;       # stop all processing if 1
 
@@ -438,7 +437,6 @@ my class ParaIterator does Iterator {
            \pressure,
       uint $batch,
       uint $auto,
-      uint $todo,
     ) {
         my $self := nqp::create(self);
 
@@ -451,7 +449,6 @@ my class ParaIterator does Iterator {
 
         nqp::bindattr_i($self,ParaIterator,'$!batch', $batch );
         nqp::bindattr_i($self,ParaIterator,'$!auto',  $auto  );
-        nqp::bindattr_i($self,ParaIterator,'$!todo',  $todo  );
         $self
     }
 
@@ -464,36 +461,15 @@ my class ParaIterator does Iterator {
         # Stop delivering after this buffer
         if nqp::eqaddr($next,$!lastsema) {
             self.stop;  # shut everything down
-            return $buffer;
         }
 
         # Complete shutdown requested
-        if nqp::atomicload_i($!stop) {
-            return emptyIB;
-        }
-
-        # Need to monitor number of results to deliver
-        elsif $!todo {
-            my int $todo = nqp::sub_i($!todo,nqp::elems($buffer));
-            if $todo <= 0 {
-                # Stop all processing, we have enough
-                self.stop;
-
-                # Get rid of all values we don't need
-                return nqp::splice(
-                  $buffer,
-                  emptyIB,
-                  nqp::add_i(nqp::elems($buffer),$todo),
-                  nqp::neg_i($todo)
-                );
-            }
-            else {
-                $!todo = $todo;
-            }
+        elsif nqp::atomicload_i($!stop) {
+            nqp::setelems($buffer,0);
         }
 
         # Nothing else ready to be delivered
-        if nqp::isnull(nqp::atpos($!waiting,0)) {
+        elsif nqp::isnull(nqp::atpos($!waiting,0)) {
 
             # Initiate more work using last batch value calculated
             nqp::push($!pressure,$!batch);
@@ -691,7 +667,6 @@ class ParaSeq does Sequence {
     has uint      $.batch;       # initial batch size, must be > 0
     has uint      $!auto;        # 1 if batch size automatically adjusts
     has uint      $.degree;      # number of CPUs, must be > 1
-    has uint      $!stop-after;  # stop after these number of values
     has atomicint $!stop;        # stop all processing if 1
     has atomicint $.discarded;   # produced values discarded because of stop
 
@@ -720,7 +695,6 @@ class ParaSeq does Sequence {
       uint $batch,
       uint $auto,
       uint $degree,
-      uint $stop-after,
     ) is hidden-from-backtrace {
         my $self := nqp::create(self);
         nqp::bindattr($self, ParaSeq, '$!source',    $source    );
@@ -731,7 +705,6 @@ class ParaSeq does Sequence {
         nqp::bindattr_i($self, ParaSeq, '$!batch',      $batch     );
         nqp::bindattr_i($self, ParaSeq, '$!auto',       $auto      );
         nqp::bindattr_i($self, ParaSeq, '$!degree',     $degree    );
-        nqp::bindattr_i($self, ParaSeq, '$!stop-after', $stop-after);
         $self
     }
 
@@ -782,9 +755,7 @@ class ParaSeq does Sequence {
         }
 
         # Set up the result iterator
-        $!result := ParaIterator.new(
-          self, $pressure, $!batch, $!auto, $!stop-after
-        );
+        $!result := ParaIterator.new(self, $pressure, $!batch, $!auto);
 
         # Batcher logic for fast batching, where no special phaser handling
         # is required
@@ -998,9 +969,8 @@ class ParaSeq does Sequence {
     method default-batch()  { $default-batch  }
     method default-degree() { $default-degree }
 
-    multi method is-lazy(ParaSeq:D:) {
-        nqp::hllbool($!source.is-lazy && nqp::not_i($!stop-after))
-    }
+    multi method is-lazy(ParaSeq:D:) { $!source.is-lazy }
+
     method is-deterministic(ParaSeq:D:) {
         nqp::hllbool($!source.is-deterministic)
     }
@@ -1014,13 +984,6 @@ class ParaSeq does Sequence {
 
     method processed(ParaSeq:D:) { self.stats.map(*.processed).sum }
     method produced(ParaSeq:D:)  { self.stats.map(*.produced ).sum }
-
-    proto method stop-after(|) {*}
-    multi method stop-after(ParaSeq:D:) { $!stop-after || False }
-    multi method stop-after(ParaSeq:D: Int() $stop-after) {
-        $!stop-after = $stop-after > 0 ?? $stop-after !! 0;
-        self
-    }
 
     method stopped(ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
 
@@ -2154,19 +2117,16 @@ class ParaSeq does Sequence {
     proto method hyper(|) {*}
 
     # If the degree is 1, then just return the iterable, nothing to parallelize
-    multi method hyper(ParaSeq:
-      \iterable, $, $, 1, $
-    ) is implementation-detail {
+    multi method hyper(ParaSeq: \iterable, $, $, 1) is implementation-detail {
         iterable
     }
 
     # Entry point from the subs
     multi method hyper(ParaSeq:U:
       \iterable,
-      $batch      is copy,
-      $auto       is copy,
-      $degree     is copy,
-      $stop-after is copy
+      $batch  is copy,
+      $auto   is copy,
+      $degree is copy,
     ) is implementation-detail {
         $batch := ($batch // $default-batch).Int;
         X::Invalid::Value.new(
@@ -2190,24 +2150,22 @@ class ParaSeq does Sequence {
         # Need to actually parallelize, set up ParaSeq object
         else {
             $auto       := ($auto // True).Bool;
-            $stop-after := ($stop-after // Inf) == Inf ?? 0 !! $stop-after.Int;
             self!setup(
               BufferIterator.new($buffer, $iterator),
-              $batch, $auto, $degree, $stop-after
+              $batch, $auto, $degree
             )
         }
     }
 
     # Change hypering settings along the way
-    multi method hyper(ParaSeq:D: $batch?, $degree?, :$auto, :$stop-after) {
+    multi method hyper(ParaSeq:D: $batch?, $degree?, :$auto) {
         $degree && $degree == 1
           ?? self.serial     # re-hypering with degree == 1 -> serialize
           !! ParaSeq.hyper(  # restart, taking over defaults
                self,
-               $batch      // $!batch,
-               $auto       // $!auto,
-               $degree     // $!degree,
-               $stop-after // $!stop-after
+               $batch  // $!batch,
+               $auto   // $!auto,
+               $degree // $!degree
              )
     }
 }
@@ -2215,13 +2173,13 @@ class ParaSeq does Sequence {
 #- actual interface ------------------------------------------------------------
 
 proto sub hyperize(|) is export {*}
-multi sub hyperize(\iterable, $batch?, $degree?, :$auto, :$stop-after) {
-    ParaSeq.hyper(iterable, $batch, $auto, $degree, $stop-after)
+multi sub hyperize(\iterable, $batch?, $degree?, :$auto) {
+    ParaSeq.hyper(iterable, $batch, $auto, $degree)
 }
-multi sub hyperize(List:D $list, $size?, $degree?, :$auto, :$stop-after) {
+multi sub hyperize(List:D $list, $size?, $degree?, :$auto) {
     my uint $batch = $size // $default-batch;
     $list.is-lazy || $list.elems > $batch
-      ?? ParaSeq.hyper($list, $batch, $auto, $degree, $stop-after)
+      ?? ParaSeq.hyper($list, $batch, $auto, $degree)
       !! $list
 }
 

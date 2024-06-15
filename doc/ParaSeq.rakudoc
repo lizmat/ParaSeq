@@ -13,7 +13,6 @@ use ParaSeq;
 # The 1-millionth prime number: 15485863
 say (^Inf).&hyperize.grep(*.is-prime)[999999];
 say (^Inf).&hyperize.grep(*.is-prime).skip(999999).head;
-say (^Inf).&hyperize(stop-after => 1_000_000).grep(*.is-prime).tail;
 
 # Fetching lines of files, each element containing a List of lines
 my @lines = @filenames.&hyperize(1, :!auto).map(*.IO.lines.List);
@@ -50,9 +49,6 @@ say hyperize(^Inf).grep(*.is-prime)[999999];
 
 # Start with 2000 element batches, and use max 10 workers
 say (^Inf).&hyperize(2000, 10).grep(*.is-prime)[999999];
-
-# Stop producing results after 1 million values
-say (^Inf).&hyperize(stop-after => 1_000_000).grep(*.is-prime).tail;
 
 # Always work with a batch-size of 1
 my @lines = @filenames.&hyperize(1, :!auto).map(*.lines.List);
@@ -99,13 +95,6 @@ defailt if an undefined value is specified.
 Flag.  Defaults to C<True>.  If specified with a C<False> value, then the
 batch size will B<not> be altered from the size (implicitely) specified
 with the second positional argument.
-
-=item :stop-after(N)
-
-Integer value.  Defaults to C<Inf>, indicating there is B<no> maximum number
-of values that should be delivered.  If specified, should be a positive
-integer value: the produced sequence is then B<guaranteed> not to produce
-more values than the value given.
 
 =head2 racify
 
@@ -751,8 +740,7 @@ same arguments as C<&hyperize>.
 =head3 is-lazy
 
 Bool.  Returns whether the C<ParaSeq> iterator should be considered lazy
-or not.  It will be considered lazy if the source iterator is lazy and
-B<no> value has been specified with C<:stop-after>.
+or not.  It will be considered lazy if the source iterator is lazy.
 
 =head3 processed
 
@@ -767,16 +755,6 @@ Int.  The number of items produced, as obtained from the C<stats>.
 A C<List> of C<ParaStats> objects that were produced, in the order that
 they were produced.  Note that due to the asynchronous nature of stats
 production and processing, this may be incomplete at any given time.
-
-=head3 stop-after
-
-Int or False.  Returns C<False> if there is B<no limit> on the number of
-values that can be delivered.  Otherwise returns the maximum number of
-values that will be delivered.
-
-Can also be called as a mutator if an C<Int> value is specified (or
-C<False> to inhibit any resul constraint).  When used as a mutator,
-Returns the invocant for easier chaining.
 
 =head3 stopped
 
@@ -942,7 +920,6 @@ C<IterationBuffer> and source iterator, it also contains:
 =item the initial batch size
 =item the degree (max number of worker threads)
 =item the "auto" flag
-=item any "stop after" value
 =item the $*SCHEDULER value
 
 =head2 Step 4: an interface method is called

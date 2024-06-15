@@ -14,7 +14,6 @@ use ParaSeq;
 # The 1-millionth prime number: 15485863
 say (^Inf).&hyperize.grep(*.is-prime)[999999];
 say (^Inf).&hyperize.grep(*.is-prime).skip(999999).head;
-say (^Inf).&hyperize(stop-after => 1_000_000).grep(*.is-prime).tail;
 
 # Fetching lines of files, each element containing a List of lines
 my @lines = @filenames.&hyperize(1, :!auto).map(*.IO.lines.List);
@@ -45,9 +44,6 @@ say hyperize(^Inf).grep(*.is-prime)[999999];
 
 # Start with 2000 element batches, and use max 10 workers
 say (^Inf).&hyperize(2000, 10).grep(*.is-prime)[999999];
-
-# Stop producing results after 1 million values
-say (^Inf).&hyperize(stop-after => 1_000_000).grep(*.is-prime).tail;
 
 # Always work with a batch-size of 1
 my @lines = @filenames.&hyperize(1, :!auto).map(*.lines.List);
@@ -80,10 +76,6 @@ The third positional argument indicates the maximum number of worker threads tha
   * :auto / :!auto
 
 Flag. Defaults to `True`. If specified with a `False` value, then the batch size will **not** be altered from the size (implicitely) specified with the second positional argument.
-
-  * :stop-after(N)
-
-Integer value. Defaults to `Inf`, indicating there is **no** maximum number of values that should be delivered. If specified, should be a positive integer value: the produced sequence is then **guaranteed** not to produce more values than the value given.
 
 racify
 ------
@@ -552,7 +544,7 @@ Change hypering settings on invocant and returns invocant. Takes the same argume
 
 ### is-lazy
 
-Bool. Returns whether the `ParaSeq` iterator should be considered lazy or not. It will be considered lazy if the source iterator is lazy and **no** value has been specified with `:stop-after`.
+Bool. Returns whether the `ParaSeq` iterator should be considered lazy or not. It will be considered lazy if the source iterator is lazy.
 
 ### processed
 
@@ -565,12 +557,6 @@ Int. The number of items produced, as obtained from the `stats`.
 ### stats
 
 A `List` of `ParaStats` objects that were produced, in the order that they were produced. Note that due to the asynchronous nature of stats production and processing, this may be incomplete at any given time.
-
-### stop-after
-
-Int or False. Returns `False` if there is **no limit** on the number of values that can be delivered. Otherwise returns the maximum number of values that will be delivered.
-
-Can also be called as a mutator if an `Int` value is specified (or `False` to inhibit any resul constraint). When used as a mutator, Returns the invocant for easier chaining.
 
 ### stopped
 
@@ -701,8 +687,6 @@ If step 1 and 2 didn't result in a premature return, then a `ParaSeq` object is 
   * the degree (max number of worker threads)
 
   * the "auto" flag
-
-  * any "stop after" value
 
   * the $*SCHEDULER value
 

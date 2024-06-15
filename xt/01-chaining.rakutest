@@ -3,17 +3,16 @@ use paths;
 use path-utils;
 use ParaSeq;
 
-plan 9;
+plan 10;
 
-my uint $stop-after = 1000;
+my uint $head = 1000;
 
-sub is-Para($seq, str $tag, :$stop-after = False) is test-assertion {
+sub is-Para($seq, str $tag) is test-assertion {
     subtest "$tag: check ParaSeq" => {
-        plan 4;
+        plan 3;
         isa-ok $seq, ParaSeq;
         is $seq.stats.elems, 0, "$tag: nothing happened yet";
         is-deeply $seq.auto, True, 'auto is set';
-        is-deeply $seq.stop-after, $stop-after, 'stop-afer is NOT set';
     }
 }
 
@@ -35,16 +34,19 @@ is-Para($seq5, 'lines');
 my $seq6 = $seq5.pairs;
 is-Para($seq6, 'pairs');
 
-my $seq7 = $seq6.stop-after($stop-after).grep(*.value.contains("expandtab"));
-is-Para($seq7, 'grep(expandtab)', :$stop-after);
+my $seq7 = $seq6.grep(*.value.contains("expandtab"));
+is-Para($seq7, 'grep(expandtab)');
 
-my @result := $seq7.List;
+my $seq8 = $seq7.head($head);
+is-Para($seq8, "head($head)");
+
+my @result := $seq8.List;
 isa-ok @result.are, Pair, 'All pairs';
-is @result.elems, $stop-after, 'Did we get all the expected results';
+is @result.elems, $head, 'Did we get all the expected results';
 
-#for $seq1, $seq2, $seq3, $seq4, $seq5, $seq6, $seq7 -> $seq is raw {
+#for $seq1, $seq2, $seq3, $seq4, $seq5, $seq6, $seq7, $seq8 -> $seq is raw {
 #    say $seq.VAR.name;
-#    say "processed: $seq.processed(), produced: $seq.produced()";
+#    say "processed: $seq.processed(), produced: $seq.produced(), discarded: $seq.discarded()";
 #    .say for $seq.stats.head(20);
 #}
 

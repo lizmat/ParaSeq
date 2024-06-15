@@ -1,0 +1,38 @@
+use Test;
+use ParaSeq;
+
+plan 5;
+
+my $io := $*PROGRAM.parent(2).add("HN/sixteenth.txt");
+sub hypered() { $io.lines.&hyperize }
+
+sub is-Para($seq, str $tag) is test-assertion {
+    subtest "$tag: check ParaSeq" => {
+        plan 3;
+        isa-ok $seq, ParaSeq;
+        is $seq.stats.elems, 0, "$tag: nothing happened yet";
+        is-deeply $seq.auto, True, 'auto is set';
+    }
+}
+
+my $seq1 = $io.lines.&hyperize.pairs;
+is-Para($seq1, 'pairs');
+
+my $seq2 = $seq1.grep(*.value.contains("Chinese"));
+is-Para($seq2, 'grep');
+
+my $seq3 = $seq2.head(100);
+is-Para($seq3, 'grep');
+
+my @result := $seq3.List;
+is @result.elems, 100, 'did we get all the results';
+
+ok $seq1.produced < @result.tail.key * 1.05, 'Not more than 5% overshoot';
+
+#for $seq1, $seq2, $seq3 -> $seq is raw {
+#    say $seq.VAR.name;
+#    say "processed: $seq.processed(), produced: $seq.produced(), discarded: $seq.discarded()";
+#    .say for $seq.stats.tail(20);
+#}
+
+# vim: expandtab shiftwidth=4
