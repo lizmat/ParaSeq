@@ -430,7 +430,6 @@ my class ParaIterator does Iterator {
     has uint      $!produced;   # number of items produced so far
     has uint      $!nsecs;      # nano seconds wallclock used so far
     has           $!lastsema;   # the last semaphore that should be processed
-    has atomicint $!stop;       # stop all processing if 1
 
     method new(
            \parent,
@@ -460,12 +459,7 @@ my class ParaIterator does Iterator {
 
         # Stop delivering after this buffer
         if nqp::eqaddr($next,$!lastsema) {
-            self.stop;  # shut everything down
-        }
-
-        # Complete shutdown requested
-        elsif nqp::atomicload_i($!stop) {
-            nqp::setelems($buffer,0);
+            nqp::unshift($!queues,IE);
         }
 
         # Nothing else ready to be delivered
@@ -611,12 +605,6 @@ my class ParaIterator does Iterator {
 
     method set-lastsema($lastsema is raw) { $!lastsema := $lastsema }
 
-    method stop(ParaIterator:D:) is implementation-detail {
-        nqp::atomicstore_i($!stop,1);  # stop producing
-        nqp::unshift($!queues,IE);     # stop reading from queues
-        $!parent.stop;                 # stop all threads
-    }
-
     # Add a semaphore to the queue.  This is a ParaQueue to which a fully
     # processed IterationBuffer will be pushed when it is ready.  This
     # guarantees that the order of the results will be the order in which
@@ -667,8 +655,6 @@ class ParaSeq does Sequence {
     has uint      $.batch;       # initial batch size, must be > 0
     has uint      $!auto;        # 1 if batch size automatically adjusts
     has uint      $.degree;      # number of CPUs, must be > 1
-    has atomicint $!stop;        # stop all processing if 1
-    has atomicint $.discarded;   # produced values discarded because of stop
 
 #- "last" handling -------------------------------------------------------------
 
@@ -777,8 +763,7 @@ class ParaSeq does Sequence {
 
             # Until we're halted or have a buffer that's not full
             nqp::until(
-              nqp::atomicload_i($!stop)  # complete shutdown requested
-                || $exhausted,           # nothing left to batch
+              $exhausted,       # nothing left to batch
               nqp::stmts(
                 ($exhausted = nqp::eqaddr(
                   $source.push-exactly(
@@ -788,7 +773,7 @@ class ParaSeq does Sequence {
                   IE
                 )),
                 nqp::if(         # add if something to add
-                  nqp::elems($buffer) && nqp::not_i(nqp::atomicload_i($!stop)),
+                  nqp::elems($buffer),
                   nqp::stmts(
                     nqp::unless(
                       nqp::isnull($snitcher),
@@ -826,7 +811,7 @@ class ParaSeq does Sequence {
             }
 
             # Until the source iterator is exhausted or we're halted
-            until $exhausted || nqp::atomicload_i($!stop) {
+            until $exhausted {
 
                 # Setup buffer with initial value
                 nqp::push((my $buffer := nqp::create(IB)),$initial);
@@ -844,9 +829,8 @@ class ParaSeq does Sequence {
                 $exhausted = nqp::eqaddr(($initial := $source.pull-one),IE)
                   unless $exhausted;
 
-                # Process if there's something to process and not halted
-                if nqp::elems($buffer)
-                  && nqp::not_i(nqp::atomicload_i($!stop)) {
+                # Process if there's something to process
+                if nqp::elems($buffer) {
 
                     # Snitch if so indicated
                     $snitcher($buffer.List) unless nqp::isnull($snitcher);
@@ -902,31 +886,21 @@ class ParaSeq does Sequence {
            $semaphore is raw,
            $output is raw
     ) {
+        # Push the statistics into the waiting queue of the iterator
+        # so that it has up-to-date information to determine future
+        # batch sizes
+        nqp::push(
+          $!result.waiting,
+          ParaStats.new(
+            $ordinal,
+            nqp::elems($input),
+            nqp::elems($output),
+            nqp::time() - $then
+          )
+        ) if nqp::istype($!result,ParaIterator);
 
-        # No longer running, mark as discarded
-        if nqp::atomicload_i($!stop) {
-            nqp::atomicadd_i($!discarded,nqp::elems($output));
-        }
-
-        # Still running
-        else {
-
-            # Push the statistics into the waiting queue of the iterator
-            # so that it has up-to-date information to determine future
-            # batch sizes
-            nqp::push(
-              $!result.waiting,
-              ParaStats.new(
-                $ordinal,
-                nqp::elems($input),
-                nqp::elems($output),
-                nqp::time() - $then
-              )
-            ) if nqp::istype($!result,ParaIterator);
-
-            # Make the produced values available to the result iterator
-            nqp::push($semaphore,$output);
-        }
+        # Make the produced values available to the result iterator
+        nqp::push($semaphore,$output);
     }
 
     # Just count the number of produced values
@@ -950,11 +924,6 @@ class ParaSeq does Sequence {
 #- where all the magic happens under the hood ----------------------------------
 
     method iterator(ParaSeq:D:) { nqp::ifnull($!result,$!source) }
-
-    method stop(ParaSeq:D:) {
-        nqp::atomicstore_i($!stop,1);
-        $!source.stop if nqp::istype($!source,ParaIterator);
-    }
 
 #- introspection ---------------------------------------------------------------
 
@@ -984,8 +953,6 @@ class ParaSeq does Sequence {
 
     method processed(ParaSeq:D:) { self.stats.map(*.processed).sum }
     method produced(ParaSeq:D:)  { self.stats.map(*.produced ).sum }
-
-    method stopped(ParaSeq:D:) { nqp::hllbool(nqp::atomicload_i($!stop)) }
 
     method threads(ParaSeq:D:) {
         self.stats.map(*.threadid).unique.List
@@ -1022,7 +989,6 @@ class ParaSeq does Sequence {
     proto method head(|) {*}
     multi method head(ParaSeq:D:) {
         my $value := self.iterator.pull-one;
-        self.stop;
         nqp::eqaddr($value,IE) ?? Nil !! $value
     }
 
@@ -1172,7 +1138,7 @@ class ParaSeq does Sequence {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
-                # Store the Pairs as fast as possible, no stop check needed
+                # Store the Pairs as fast as possible
                 my uint $i;
                 nqp::while(
                   $i < $elems,
@@ -1201,7 +1167,7 @@ class ParaSeq does Sequence {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
-                # Ultra-fast batching, don't care about checking stopper
+                # Ultra-fast batching
                 my uint $elems = nqp::elems($input);
                 my uint $start;
                 my uint $end = nqp::sub_i($size,1);
@@ -1514,7 +1480,7 @@ class ParaSeq does Sequence {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
-                # Store the key values as fast as possible, no stop check needed
+                # Store the key values as fast as possible
                 my uint $i;
                 nqp::while(
                   $i < $elems,
@@ -1758,7 +1724,7 @@ class ParaSeq does Sequence {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
-                # Store the Pairs as fast as possible, no stop check needed
+                # Store the Pairs as fast as possible
                 my uint $i;
                 nqp::while(
                   $i < $elems,
@@ -1854,7 +1820,7 @@ class ParaSeq does Sequence {
                 my int $m = nqp::elems($input);
                 $i = 0;
                 nqp::until(
-                  $i == $m || nqp::atomicload_i($!stop),
+                  $i == $m,
                   nqp::unless(
                     nqp::existskey(
                       $seen,
@@ -2037,7 +2003,6 @@ class ParaSeq does Sequence {
         self
     }
     multi method skip(ParaSeq:D: Whatever) {
-        self.stop;
         self!re-source: Rakudo::Iterator.Empty
     }
     multi method skip(ParaSeq:D: |c) {
@@ -2080,11 +2045,9 @@ class ParaSeq does Sequence {
     multi method BagHash(ParaSeq:D:) { self.List.BagHash }
 
     multi method Bool(ParaSeq:D:) {
-        my $Bool := nqp::hllbool(
+        nqp::hllbool(
           nqp::not_i(nqp::eqaddr(self.iterator.pull-one,IterationEnd))
-        );
-        self.stop;
-        $Bool
+        )
     }
 
     multi method eager(ParaSeq:D:) { self.List      }

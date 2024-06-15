@@ -346,8 +346,6 @@ skip
 
 The simple cases of `.skip()` and `.skip(N)` are handled by skipping that amount on the result iterator and returning the invocant.
 
-The case of `.skip(*)` is handled by stopping any production of values and returning an empty `Seq`.
-
 The nature of the other types of arguments on the [`.skip`](https://docs.raku.org/type/Seq#method_skip) method basically makes it impossible to hyper. Therefore, **no** specific hypering logic has been added for these cases.
 
 slice
@@ -557,10 +555,6 @@ Int. The number of items produced, as obtained from the `stats`.
 ### stats
 
 A `List` of `ParaStats` objects that were produced, in the order that they were produced. Note that due to the asynchronous nature of stats production and processing, this may be incomplete at any given time.
-
-### stopped
-
-Bool. `True` if the processing of this `ParaSeq` has been halted. Otherwise `False`
 
 ### threads
 
