@@ -1,8 +1,12 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.2.1  2024-06-15T13:49:33+02:00
     - Removed the :stop-after functionality: it was more trouble
       than it was worth
+    - Removed the .stop / .discarded functionality: it was more
+      trouble than it was worth
 
 0.2.0  2024-06-14T13:14:48+02:00
     - Re-imagined infectiousness which makes chaining methods

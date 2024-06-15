@@ -471,10 +471,10 @@ my class ParaIterator does Iterator {
 
         # At least one further batch ready to be delivered
         else {
-            self!update-stats;
 
             # Update batch size
             if $!auto {
+                self!update-stats;
                 $!batch =
                   nqp::div_i(nqp::mul_i($!processed,$target-nsecs),$!nsecs)
                   if $!nsecs;
