@@ -17,7 +17,7 @@ say (^Inf).&hyperize.grep(*.is-prime).skip(999999).head;
 
 # Fetching lines of files, each element containing a List of lines
 my @lines = @filenames.&hyperize(1, :!auto).map(*.IO.lines.List);
-my %lines = @filenames.&hyperize(1, :!auto).map: { $_ => .IO.lines.List }
+my %lines = @filenames.&racify(1, :!auto).map: { $_ => .IO.lines.List }
 ```
 
 DESCRIPTION
@@ -84,11 +84,13 @@ racify
 my %lines = @filenames.&racify(1, :!auto).map: { $_ => .IO.lines.List }
 ```
 
-There is no functional difference between `hyperize` and `racify` as of version `0.0.4`. So it is only kept to remain compatible with the `hyperize` module.
+There is very little functional difference between `hyperize` and `racify`. The only difference is that while `hyperize` will guarantee that the order of the produced values is the same as their source values, `racify` does **not** offer such a guarantee.
 
-The decision to remove the specific racing capability was made after it became clear that there was a race condition (no pun intended) in determining when the iteration was finished. To fix this deficiency would require quite a bit of additional logic, that would slow down execution in both the hypered and racing case.
+From a performance point of view, `racify` **may** be a few percent faster than `hyperize`, but one should generally not use it for that reason.
 
-As the difference in performance between hypering and racing was basically only one less `push` / `shift` per batch, it felt that this would only be a small price to pay. On top of that, removing the feature also means two fewer attribute checks per batch as well, so that could be counted as an overall win.
+One situation to use `racify` over `hyperize` is when any results are expected as soon as they become available, without waiting for any results from a previous batch being delivered.
+
+One should also note that the use of the `last` statement in a `grep` or `map` may produce random results, as delivery of produced values is halted after the batch that was produced while the `last` statement was executed, has been delivered.
 
 ENDPOINT METHODS
 ================
@@ -536,7 +538,7 @@ Int. The default maximum number of worker threads to be used. Currently set to t
 
 ### hyper
 
-Change hypering settings on invocant and returns invocant. Takes the same arguments as `&hyperize`.
+Change hypering settings on invocant and returns invocant. Takes the same arguments as `&hyperize`. Additionally takes a `:racing` named argument, to indicate `racing` or `hypering` semantics.
 
 ### is-lazy
 
@@ -549,6 +551,10 @@ Int. The number of items processed, as obtained from the `stats`.
 ### produced
 
 Int. The number of items produced, as obtained from the `stats`.
+
+### racing
+
+Bool. Returns `True` if racing (aka, parallelizing without taking care of the order in which values will be delivered). Else `False`.
 
 ### stats
 
@@ -578,6 +584,10 @@ Int. The number of values processed in the associated batch (aka the batch size 
 ### produced
 
 Int. The number of values that were produced in the associated batch. This can be `0`, or a higher value than `processed` when `.map` was called with a `Callable` that produced `Slip` values.
+
+### smoothed-nsecs
+
+Int. The number of nano-seconds that it took to process all values in the associated batch, corrected for any Garbage Collection cycles.
 
 ### threadid
 

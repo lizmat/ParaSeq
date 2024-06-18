@@ -47,7 +47,7 @@ is @result.elems, $head, 'Did we get all the expected results';
 #for $seq1, $seq2, $seq3, $seq4, $seq5, $seq6, $seq7, $seq8 -> $seq is raw {
 #    say $seq.VAR.name;
 #    say "processed: $seq.processed(), produced: $seq.produced()";
-#    .say for $seq.stats.head(20);
+#    .say for $seq.stats.tail(20);
 #}
 
 # vim: expandtab shiftwidth=4

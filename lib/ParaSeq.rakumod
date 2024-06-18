@@ -6,6 +6,7 @@ use nqp;
 my uint $default-batch  = 16;
 my uint $default-degree = Kernel.cpu-cores-but-one;
 my uint $target-nsecs   = 1_000_000;  # .001 second
+my uint $target-nsecs2  = nqp::mul_i($target-nsecs,2);
 
 # Helper sub to determine granularity of batches depending on the signature
 # of a callable
@@ -136,20 +137,22 @@ my role BlockMapper {
         my $iterator := $input.List."$method"($this-mapper, |%_).iterator;
         my $output   := nqp::create(IB);
 
+        # Run element by element if post-processing needed
         if $postprocess {
             nqp::until(
               nqp::eqaddr((my $pulled := $iterator.pull-one),IE),
               $postprocess($iterator, $output, $pulled)
             );
         }
+
+        # Just get all the value
         else {
-            # Just run the method with all the named arguments
             $iterator.push-all($output);
         }
 
         # Mark this semaphore as the last to be handled if a
         # "last" was executed
-        $result.set-lastsema($semaphore) if $*LAST;
+        $result.set-lastsema($semaphore, $output) if $*LAST;
 
         # Return the result
         $output
@@ -431,6 +434,7 @@ my class ParaIterator does Iterator {
     has uint      $!produced;   # number of items produced so far
     has uint      $!nsecs;      # nano seconds wallclock used so far
     has           $!lastsema;   # the last semaphore that should be processed
+    has atomicint $!unhandled;  # number of unhandled batches
 
     method new(
            \parent,
@@ -451,14 +455,35 @@ my class ParaIterator does Iterator {
         nqp::bindattr_i($self,ParaIterator,'$!racing', $racing);
         nqp::bindattr_i($self,ParaIterator,'$!batch',  $batch );
         nqp::bindattr_i($self,ParaIterator,'$!auto',   $auto  );
+
+        # Set up initial barrier.  Once the final batch has been scheduled
+        # for processing, .close-queues will decrement this final value and
+        # thus indicate completion
+        nqp::bindattr_i($self,ParaIterator,'$!unhandled',1);
         $self
+    }
+
+    # Mark another batch for processing
+    method mark-batch-for-processing() {
+        nqp::atomicinc_i($!unhandled);
+    }
+
+    # Handling when the current result buffer is exhausted
+    method !next() {
+        if nqp::atomicload_i($!unhandled) {
+            nqp::atomicdec_i($!unhandled);
+            nqp::shift($!queues);  # block until provided/IE on premature end
+        }
+        else {
+            IE                     # delivered all batches
+        }
     }
 
     # Thread-safely handle next batch
     method !next-batch($next is raw) {
 
         # Next buffer to be processed
-        my $buffer := nqp::shift($next);
+        my $buffer := $!racing ?? $next !! nqp::shift($next);
 
         # Stop delivering after this buffer
         if nqp::eqaddr($next,$!lastsema) {
@@ -494,9 +519,9 @@ my class ParaIterator does Iterator {
           nqp::isnull(nqp::atpos($!waiting,0)),
           nqp::stmts(
             nqp::push($!stats,my $stats := nqp::shift($!waiting)),
-            ($processed = nqp::add_i($processed,$stats.processed)),
-            ($produced  = nqp::add_i($produced, $stats.produced )),
-            ($nsecs     = nqp::add_i($nsecs,    $stats.nsecs    ))
+            ($processed = nqp::add_i($processed,$stats.processed     )),
+            ($produced  = nqp::add_i($produced, $stats.produced      )),
+            ($nsecs     = nqp::add_i($nsecs,    $stats.smoothed-nsecs))
           )
         );
 
@@ -505,8 +530,6 @@ my class ParaIterator does Iterator {
         $!produced  = $produced;
         $!nsecs     = $nsecs;
     }
-
-    method !next() { nqp::shift($!queues) }
 
     method pull-one(ParaIterator:D:) {
         nqp::if(
@@ -594,7 +617,7 @@ my class ParaIterator does Iterator {
     }
 
     method close-queues(ParaIterator:D:) is implementation-detail {
-        nqp::push($!queues,IE)
+        nqp::atomicdec_i($!unhandled)  # remove the barrier
     }
 
     method stats(ParaIterator:D:) is raw is implementation-detail {
@@ -602,14 +625,22 @@ my class ParaIterator does Iterator {
         $!stats
     }
 
-    method set-lastsema($lastsema is raw) { $!lastsema := $lastsema }
+    # Set the last batch to be produced, unless it was already set:
+    # the first one set, wins!
+    method set-lastsema($lastsema is raw, $output is raw) {
+        $!lastsema := $!racing ?? $output !! $lastsema
+          unless nqp::isconcrete($!lastsema);
+    }
 
     # Add a semaphore to the queue.  This is a ParaQueue to which a fully
     # processed IterationBuffer will be pushed when it is ready.  This
     # guarantees that the order of the results will be the order in which
-    # this method will be called.
+    # this method will be called.  When racing, just return the queues
+    # Paraqueue to push to whenever results are ready to be pushed
     method semaphore() is implementation-detail {
-        nqp::push($!queues,nqp::create(ParaQueue))
+        $!racing
+          ?? $!queues
+          !! nqp::push($!queues,nqp::create(ParaQueue))
     }
 }
 
@@ -637,7 +668,17 @@ class ParaStats {
         $self
     }
 
-    method average-nsecs(ParaStats:D:) { $!nsecs div $!processed }
+    # If the time it took for the batch to be processed is more than twice
+    # the target slice time, then most likely there has been a garbage
+    # collection run, which halts the world for a tiny bit.  But enough to
+    # mess up any calculations.  So we basically do a modulo on the time,
+    # but make sure we have at least the target slice time in there as well.
+    # This appears to produce the best timing calculations
+    method smoothed-nsecs(ParaStats:D:) {
+        $!nsecs > $target-nsecs2
+          ?? nqp::add_i(nqp::mod_i($!nsecs,$target-nsecs),$target-nsecs)
+          !! $!nsecs
+    }
 
     multi method gist(ParaStats:D:) {
         "#$!threadid - $!ordinal: $!processed / $!produced ($!nsecs nsecs)"
@@ -761,6 +802,7 @@ class ParaSeq does Sequence {
             # result iterator
             if nqp::isconcrete($first) {
                 $snitcher($first) unless nqp::isnull($snitcher);
+                $result.mark-batch-for-processing;
                 processor($ordinal, $first, $result.semaphore);
             }
 
@@ -782,6 +824,7 @@ class ParaSeq does Sequence {
                       nqp::isnull($snitcher),
                       $snitcher($buffer.List)
                     ),
+                    $result.mark-batch-for-processing;
                     processor(++$ordinal, $buffer, $result.semaphore);
                   )
                 )
@@ -810,6 +853,7 @@ class ParaSeq does Sequence {
             # result iterator
             if nqp::isconcrete($first) {
                 $snitcher($first) unless nqp::isnull($snitcher);
+                $result.mark-batch-for-processing;
                 processor($ordinal, $exhausted, $first, $result.semaphore);
             }
 
@@ -839,6 +883,7 @@ class ParaSeq does Sequence {
                     $snitcher($buffer.List) unless nqp::isnull($snitcher);
 
                     # Schedule the batch
+                    $result.mark-batch-for-processing;
                     processor(
                       ++$ordinal, $exhausted, $buffer, $result.semaphore
                     );
