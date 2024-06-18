@@ -522,8 +522,6 @@ Can be used in any situation where a `Seq` could also be used. The following add
 
 Bool. Returns whether batch sizes will be automatically optimized to provide the best throughput.
 
-Can also be called as a mutator if a `Bool` value is specified. In that case, returns the invocant for easier chaining.
-
 ### batch-sizes
 
 Range. The smallest and largest batch size as a `Range`.
@@ -749,7 +747,7 @@ It is then up to the code that iterators over the (result) iterator to consume t
 
 When the deliverer is done with a result batch, it removes all available statistics information and adds these to the `stats` of the `ParaSeq` object. It also uses this information to calculate an optimum batch size for any other batches to be processed (unless this is inhibited by the `:!auto` named argument to `.&hyperize`).
 
-The algorithm for batch size calculation is pretty simple at the moment. To allow for optimum responsiveness of the program, as well as any other processes running on the computer, a time slice of 500_000 nanoseconds has been chosen.
+The algorithm for batch size calculation is pretty simple at the moment. To allow for optimum responsiveness of the program, as well as any other processes running on the computer, a time slice of 1_000_000 nanoseconds (aka 1 millisecond) has been chosen.
 
 If a batch took almost exactly that amount of time to produce values, then the size of that batch is assumed to be the optimum size. If the batch took longer, then the batch size should be reduced. If the batch took less than that to complete, then the batch size should be increased.
 

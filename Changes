@@ -1,6 +1,7 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+    - Removed the .auto mutator, much clearer to use .hyper for that
 
 0.2.1  2024-06-15T13:49:33+02:00
     - Removed the :stop-after functionality: it was more trouble

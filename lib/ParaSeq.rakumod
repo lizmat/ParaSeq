@@ -5,7 +5,7 @@ use nqp;
 
 my uint $default-batch  = 16;
 my uint $default-degree = Kernel.cpu-cores-but-one;
-my uint $target-nsecs   = 500_000;  # .0005 second
+my uint $target-nsecs   = 1_000_000;  # .001 second
 
 # Helper sub to determine granularity of batches depending on the signature
 # of a callable
@@ -424,6 +424,7 @@ my class ParaIterator does Iterator {
     has ParaQueue $!pressure;   # backpressure provider
     has ParaQueue $.waiting;    # queue with unprocessed ParaStats objects
     has IB        $!stats;      # list with processed ParaStats objects
+    has uint      $!racing;     # 1 if racing, 0 if hypering
     has uint      $!batch;      # initial / current batch size
     has uint      $!auto;       # 1 if batch size automatically adjust on load
     has uint      $!processed;  # number of items processed so far
@@ -434,6 +435,7 @@ my class ParaIterator does Iterator {
     method new(
            \parent,
            \pressure,
+      uint $racing,
       uint $batch,
       uint $auto,
     ) {
@@ -446,8 +448,9 @@ my class ParaIterator does Iterator {
         nqp::bindattr($self,ParaIterator,'$!waiting', nqp::create(ParaQueue));
         nqp::bindattr($self,ParaIterator,'$!stats',   nqp::create(IB)       );
 
-        nqp::bindattr_i($self,ParaIterator,'$!batch', $batch );
-        nqp::bindattr_i($self,ParaIterator,'$!auto',  $auto  );
+        nqp::bindattr_i($self,ParaIterator,'$!racing', $racing);
+        nqp::bindattr_i($self,ParaIterator,'$!batch',  $batch );
+        nqp::bindattr_i($self,ParaIterator,'$!auto',   $auto  );
         $self
     }
 
@@ -509,12 +512,14 @@ my class ParaIterator does Iterator {
         $!nsecs     = $nsecs;
     }
 
+    method !next() { nqp::shift($!queues) }
+
     method pull-one(ParaIterator:D:) {
         nqp::if(
           nqp::elems($!current),
           (my $pulled := nqp::shift($!current)),
           nqp::if(
-            nqp::eqaddr((my $next := nqp::shift($!queues)),IE),
+            nqp::eqaddr((my $next := self!next),IE),
             (return IE),
             nqp::stmts(
               ($!current := self!next-batch($next)),
@@ -543,7 +548,7 @@ my class ParaIterator does Iterator {
               )
             ),
             nqp::if(             # ignored whole buffer, fetch next
-              nqp::eqaddr((my $next := nqp::shift($queues)),IE),
+              nqp::eqaddr((my $next := self!next),IE),
               nqp::stmts(
                 nqp::setelems($!current,0),  # invalidate current contents
                 (return 0)                   # really done
@@ -567,7 +572,7 @@ my class ParaIterator does Iterator {
           nqp::stmts(
             nqp::splice(target,$current,nqp::elems(target),0),
             nqp::if(
-              nqp::eqaddr((my $next := nqp::shift($queues)),IE),
+              nqp::eqaddr((my $next := self!next),IE),
               (return IE),
               ($current := self!next-batch($next))
             )
@@ -586,7 +591,7 @@ my class ParaIterator does Iterator {
           nqp::stmts(
             target.append($current.List),
             nqp::if(
-              nqp::eqaddr((my $next := nqp::shift($queues)),IE),
+              nqp::eqaddr((my $next := self!next),IE),
               (return IE),
               ($current := self!next-batch($next))
             )
@@ -652,9 +657,10 @@ class ParaSeq does Sequence {
     has           $!result;      # iterator producing result values
     has           $!SCHEDULER;   # $*SCHEDULER to be used
     has           $!snitcher;    # the snitcher to be called before/after
-    has uint      $.batch;       # initial batch size, must be > 0
+    has uint      $!racing;      # 1 = racing, 0 = hypering
+    has uint      $!batch;       # initial batch size, must be > 0
     has uint      $!auto;        # 1 if batch size automatically adjusts
-    has uint      $.degree;      # number of CPUs, must be > 1
+    has uint      $!degree;      # number of CPUs, must be > 1
 
 #- "last" handling -------------------------------------------------------------
 
@@ -678,6 +684,7 @@ class ParaSeq does Sequence {
     # Set up object and return it
     method !setup(
            $source,
+      uint $racing,
       uint $batch,
       uint $auto,
       uint $degree,
@@ -688,9 +695,10 @@ class ParaSeq does Sequence {
         nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $*SCHEDULER);
         nqp::bindattr($self, ParaSeq, '$!snitcher',  nqp::null  );
 
-        nqp::bindattr_i($self, ParaSeq, '$!batch',      $batch     );
-        nqp::bindattr_i($self, ParaSeq, '$!auto',       $auto      );
-        nqp::bindattr_i($self, ParaSeq, '$!degree',     $degree    );
+        nqp::bindattr_i($self, ParaSeq, '$!racing', $racing);
+        nqp::bindattr_i($self, ParaSeq, '$!batch',  $batch );
+        nqp::bindattr_i($self, ParaSeq, '$!auto',   $auto  );
+        nqp::bindattr_i($self, ParaSeq, '$!degree', $degree);
         $self
     }
 
@@ -741,7 +749,8 @@ class ParaSeq does Sequence {
         }
 
         # Set up the result iterator
-        $!result := ParaIterator.new(self, $pressure, $!batch, $!auto);
+        $!result :=
+          ParaIterator.new(self, $pressure, $!racing, $!batch, $!auto);
 
         # Batcher logic for fast batching, where no special phaser handling
         # is required
@@ -927,9 +936,7 @@ class ParaSeq does Sequence {
 
 #- introspection ---------------------------------------------------------------
 
-    proto method auto(|) {*}
-    multi method auto(ParaSeq:D:             ) { nqp::hllbool($!auto) }
-    multi method auto(ParaSeq:D: Bool() $auto) { $!auto = $auto       }
+    method auto(ParaSeq:D:) { nqp::hllbool($!auto) }
 
     method batch-sizes(ParaSeq:D:) {
         self.stats.map(*.processed).minmax
@@ -946,6 +953,8 @@ class ParaSeq does Sequence {
     method is-monotonically-increasing(ParaSeq:D:) {
         nqp::hllbool($!source.is-monotonically-increasing)
     }
+
+    method racing(ParaSeq:D:) { nqp::hllbool($!racing) }
 
     method stats(ParaSeq:D:) {
         nqp::isnull($!result) ?? () !! $!result.stats.List
@@ -2080,13 +2089,14 @@ class ParaSeq does Sequence {
     proto method hyper(|) {*}
 
     # If the degree is 1, then just return the iterable, nothing to parallelize
-    multi method hyper(ParaSeq: \iterable, $, $, 1) is implementation-detail {
+    multi method hyper(ParaSeq: \iterable, $,$,$, 1) is implementation-detail {
         iterable
     }
 
     # Entry point from the subs
     multi method hyper(ParaSeq:U:
       \iterable,
+      $racing,
       $batch  is copy,
       $auto   is copy,
       $degree is copy,
@@ -2115,17 +2125,18 @@ class ParaSeq does Sequence {
             $auto       := ($auto // True).Bool;
             self!setup(
               BufferIterator.new($buffer, $iterator),
-              $batch, $auto, $degree
+              $racing, $batch, $auto, $degree
             )
         }
     }
 
     # Change hypering settings along the way
-    multi method hyper(ParaSeq:D: $batch?, $degree?, :$auto) {
+    multi method hyper(ParaSeq:D: $batch?, $degree?, :$auto, :$racing) {
         $degree && $degree == 1
           ?? self.serial     # re-hypering with degree == 1 -> serialize
           !! ParaSeq.hyper(  # restart, taking over defaults
                self,
+               $racing // $!racing,
                $batch  // $!batch,
                $auto   // $!auto,
                $degree // $!degree
@@ -2137,19 +2148,24 @@ class ParaSeq does Sequence {
 
 proto sub hyperize(|) is export {*}
 multi sub hyperize(\iterable, $batch?, $degree?, :$auto) {
-    ParaSeq.hyper(iterable, $batch, $auto, $degree)
+    ParaSeq.hyper(iterable, 0, $batch, $auto, $degree)
 }
 multi sub hyperize(List:D $list, $size?, $degree?, :$auto) {
     my uint $batch = $size // $default-batch;
     $list.is-lazy || $list.elems > $batch
-      ?? ParaSeq.hyper($list, $batch, $auto, $degree)
+      ?? ParaSeq.hyper($list, 0, $batch, $auto, $degree)
       !! $list
 }
 
-# There doesn't seem to be too much to be gained by supporting an alternate
-# path where the order of the results is *not* preserved, as the difference
-# in implementation is only one nqp::push/nqp::shift less per batch.  So
-# just equate "racify" with "hyperize"
-my constant &racify is export = &hyperize;
+proto sub racify(|) is export {*}
+multi sub racify(\iterable, $batch?, $degree?, :$auto) {
+    ParaSeq.hyper(iterable, 1, $batch, $auto, $degree)
+}
+multi sub racify(List:D $list, $size?, $degree?, :$auto) {
+    my uint $batch = $size // $default-batch;
+    $list.is-lazy || $list.elems > $batch
+      ?? ParaSeq.hyper($list, 1, $batch, $auto, $degree)
+      !! $list
+}
 
 # vim: expandtab shiftwidth=4
