@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.2.2  2024-06-18T21:51:17+02:00
     - Removed the .auto mutator, much clearer to use .hyper for that
     - Re-implemented the &racify functionality
     - Add support for :racing named argument to .hyper method

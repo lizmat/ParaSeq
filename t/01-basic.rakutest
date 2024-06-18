@@ -1,14 +1,16 @@
 use Test;
 use ParaSeq;
 
-plan 18;
+plan 20;
 
 ok &hyperize, 'was hyperize exported';
 ok &racify,   'was racify exported';
 
-my constant $elems = 200000;
-my constant $batch = 16;
-my constant @list  = (^$elems).List;
+my constant $elems  = 200000;
+my constant $batch  = 16;
+my constant @list   = (^$elems).List;
+my constant $mapper = { $_ => 2 * $_ }
+my constant %mapped = @list.map: $mapper;
 
 isa-ok @list.&hyperize, ParaSeq, 'did hyperize produce a ParaSeq';
 isa-ok @list.&racify,   ParaSeq, 'did racify produce a ParaSeq';
@@ -29,6 +31,10 @@ for 1, ParaSeq.default-degree {
 
     is-deeply @list.&hyperize($batch, $_).serial, @list.serial,
       "did .serial produce ok with degree $_";
+
+    my %m is Map = @list.&racify($batch, $_).map($mapper);
+    is-deeply %m, %mapped,
+      "did .map(mapper) produce ok with degree $_";
 }
 
 # vim: expandtab shiftwidth=4
