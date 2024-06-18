@@ -465,25 +465,19 @@ my class ParaIterator does Iterator {
             nqp::unshift($!queues,IE);
         }
 
-        # Nothing else ready to be delivered
-        elsif nqp::isnull(nqp::atpos($!waiting,0)) {
+        # Need to handle stats to calculate optimum batch size
+        elsif $!auto {
+            self!update-stats unless nqp::isnull(nqp::atpos($!waiting,0));
+            $!batch = nqp::div_i(nqp::mul_i($!processed,$target-nsecs),$!nsecs)
+              if $!nsecs;
 
-            # Initiate more work using last batch value calculated
+            # Initiate more work with possibly updated batch size
             nqp::push($!pressure,$!batch);
         }
 
-        # At least one further batch ready to be delivered
+        # No need to handle stats here and now
         else {
-
-            # Update batch size
-            if $!auto {
-                self!update-stats;
-                $!batch =
-                  nqp::div_i(nqp::mul_i($!processed,$target-nsecs),$!nsecs)
-                  if $!nsecs;
-            }
-
-            # Initiate more work with updated batch size
+            # Initiate more work using default batch valueDD calculated
             nqp::push($!pressure,$!batch);
         }
 
@@ -603,7 +597,7 @@ my class ParaIterator does Iterator {
         nqp::push($!queues,IE)
     }
 
-    method stats(ParaIterator:D:) is implementation-detail {
+    method stats(ParaIterator:D:) is raw is implementation-detail {
         self!update-stats;
         $!stats
     }

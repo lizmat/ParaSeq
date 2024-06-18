@@ -31,8 +31,8 @@ ok $seq1.produced < @result.tail.key * 1.05, 'Not more than 5% overshoot';
 
 #for $seq1, $seq2, $seq3 -> $seq is raw {
 #    say $seq.VAR.name;
-#    say "processed: $seq.processed(), produced: $seq.produced(), discarded: $seq.discarded()";
-#    .say for $seq.stats.tail(20);
+#    say "processed: $seq.processed(), produced: $seq.produced()";
+#    .say for $seq.stats.head(50);
 #}
 
 # vim: expandtab shiftwidth=4
