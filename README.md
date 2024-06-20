@@ -530,11 +530,25 @@ Range. The smallest and largest batch size as a `Range`.
 
 ### default-batch
 
-Int. The default initial batch size: currently `16`.
+```raku
+say ParaSeq.default-batch;     # 16
+
+ParaSeq.default-batch = 1024;
+say ParaSeq.default-batch;     # 1024
+```
+
+Int. The default initial batch size: currently `16`. Can also be used to change the default batch size by assigning to it.
 
 ### default-degree
 
-Int. The default maximum number of worker threads to be used. Currently set to the number of available CPUs minus one.
+```raku
+say ParaSeq.default-degree;      # 7
+
+ParaSeq.default-degree = 3;
+say ParaSeq.defaultdegreebatch;  # 3
+```
+
+Int. The default maximum number of worker threads to be used. Currently set to the number of available CPUs minus one. Can also be used to change the default maximum number of worker threads by assigning to it.
 
 ### hyper
 

@@ -502,7 +502,7 @@ my class ParaIterator does Iterator {
 
         # No need to handle stats here and now
         else {
-            # Initiate more work using default batch valueDD calculated
+            # Initiate more work using default batch value calculated
             nqp::push($!pressure,$!batch);
         }
 
@@ -981,8 +981,8 @@ class ParaSeq does Sequence {
         self.stats.map(*.processed).minmax
     }
 
-    method default-batch()  { $default-batch  }
-    method default-degree() { $default-degree }
+    method default-batch()  is raw { $default-batch  }
+    method default-degree() is raw { $default-degree }
 
     multi method is-lazy(ParaSeq:D:) { $!source.is-lazy }
 

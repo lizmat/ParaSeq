@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 20;
+plan 24;
 
 ok &hyperize, 'was hyperize exported';
 ok &racify,   'was racify exported';
@@ -36,5 +36,14 @@ for 1, ParaSeq.default-degree {
     is-deeply %m, %mapped,
       "did .map(mapper) produce ok with degree $_";
 }
+
+is ParaSeq.default-batch, 16,   "is the default batch size correct";
+ParaSeq.default-batch = 1024;
+is ParaSeq.default-batch, 1024, "is the updated default batch size correct";
+
+is ParaSeq.default-degree, Kernel.cpu-cores-but-one,
+  "is the default degree correct";
+ParaSeq.default-degree = 3;
+is ParaSeq.default-degree, 3, "is the updated default degree correct";
 
 # vim: expandtab shiftwidth=4

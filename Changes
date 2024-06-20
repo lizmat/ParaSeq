@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+    - Make .default-batch and .default.degree left values, so you
+      can set these by just assigning to them
 
 0.2.2  2024-06-18T21:51:17+02:00
     - Removed the .auto mutator, much clearer to use .hyper for that
