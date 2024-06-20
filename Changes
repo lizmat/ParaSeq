@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.2.3  2024-06-20T19:44:33+02:00
     - Make .default-batch and .default.degree left values, so you
       can set these by just assigning to them
 
