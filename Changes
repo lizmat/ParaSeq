@@ -1,6 +1,14 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+    - Make ParaSeq a subclass of Seq, rather than a consumer of the
+      Sequence role.  This makes ParaSeq an Iterable, so easier to
+      use in the same way as a Seq.  As a result, some code could
+      be removed
+    - Added ParaIterator.sink-all for those hypering cases where only
+      the side-effects are interesting
+    - Added ParaSeq.sink to keep proper sinking semantics
+    - Removed some dead code
 
 0.2.3  2024-06-20T19:44:33+02:00
     - Make .default-batch and .default.degree left values, so you

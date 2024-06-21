@@ -582,7 +582,6 @@ my class ParaIterator does Iterator {
     # Optimized version appending to an IterationBuffer
     multi method push-all(ParaIterator:D: IterationBuffer:D \target) {
         my $current  := $!current;
-        my $queues   := $!queues;
 
         nqp::while(
           1,
@@ -601,7 +600,6 @@ my class ParaIterator does Iterator {
     # to ensure the correct semantics with .append
     multi method push-all(ParaIterator:D: \target) {
         my $current  := $!current;
-        my $queues   := $!queues;
 
         nqp::while(
           1,
@@ -612,6 +610,18 @@ my class ParaIterator does Iterator {
               (return IE),
               ($current := self!next-batch($next))
             )
+          )
+        );
+    }
+
+    # Optimized version used for its side-effects
+    method sink-all(ParaIterator:D:) {
+        nqp::while(
+          1,
+          nqp::if(
+            nqp::eqaddr((my $next := self!next),IE),
+            (return IE),
+            self!next-batch($next)
           )
         );
     }
@@ -687,9 +697,8 @@ class ParaStats {
 
 #- ParaSeq ---------------------------------------------------------------------
 # The class containing all of the logic for parallel sequences
-class ParaSeq does Sequence {
+class ParaSeq is Seq {
     has           $!source;      # iterator producing source values
-    has           $!result;      # iterator producing result values
     has           $!SCHEDULER;   # $*SCHEDULER to be used
     has           $!snitcher;    # the snitcher to be called before/after
     has uint      $!racing;      # 1 = racing, 0 = hypering
@@ -726,7 +735,7 @@ class ParaSeq does Sequence {
     ) is hidden-from-backtrace {
         my $self := nqp::create(self);
         nqp::bindattr($self, ParaSeq, '$!source',    $source    );
-        nqp::bindattr($self, ParaSeq, '$!result',    nqp::null  );
+        nqp::bindattr($self, Seq,     '$!iter',      nqp::null  );
         nqp::bindattr($self, ParaSeq, '$!SCHEDULER', $*SCHEDULER);
         nqp::bindattr($self, ParaSeq, '$!snitcher',  nqp::null  );
 
@@ -784,14 +793,16 @@ class ParaSeq does Sequence {
         }
 
         # Set up the result iterator
-        $!result :=
-          ParaIterator.new(self, $pressure, $!racing, $!batch, $!auto);
+        nqp::bindattr(
+          self, Seq, '$!iter',
+          ParaIterator.new(self, $pressure, $!racing, $!batch, $!auto)
+        );
 
         # Batcher logic for fast batching, where no special phaser handling
         # is required
         sub fast() {
             my $source   := $!source;
-            my $result   := $!result;
+            my $result   := nqp::getattr(self,Seq,'$!iter');
             my $snitcher := $!snitcher;
 
             my uint $ordinal;    # ordinal number of batch
@@ -840,7 +851,7 @@ class ParaSeq does Sequence {
         # correct phasers are executed
         sub slow() {
             my $source   := $!source;
-            my $result   := $!result;
+            my $result   := nqp::getattr(self,Seq,'$!iter');
             my $snitcher := $!snitcher;
 
             my uint $ordinal; # ordinal number of batch
@@ -906,13 +917,16 @@ class ParaSeq does Sequence {
     # this object.  If there was, clone the invocant and make the result
     # iterator the source for the clone.
     method !re-shape() {
-        if nqp::isnull($!result) {
+        if nqp::isnull(nqp::getattr(self,Seq,'$!iter')) {
             self
         }
         else {
             my $self := nqp::clone(self);
-            nqp::bindattr($self,ParaSeq,'$!source',$!result);
-            nqp::bindattr($self,ParaSeq,'$!result',nqp::null);
+            nqp::bindattr(
+              $self,ParaSeq,'$!source',
+              nqp::getattr(self,Seq,'$!iter')
+            );
+            nqp::bindattr($self,Seq,'$!iter',nqp::null);
             $self
         }
     }
@@ -922,7 +936,7 @@ class ParaSeq does Sequence {
     method !re-source($source is raw) {
         my $self := nqp::clone(self);
         nqp::bindattr($self,ParaSeq,'$!source',$source);
-        nqp::bindattr($self,ParaSeq,'$!result',nqp::null);
+        nqp::bindattr($self,Seq,'$!iter',nqp::null);
         $self
     }
 
@@ -938,28 +952,17 @@ class ParaSeq does Sequence {
         # so that it has up-to-date information to determine future
         # batch sizes
         nqp::push(
-          $!result.waiting,
+          nqp::getattr(self,Seq,'$!iter').waiting,
           ParaStats.new(
             $ordinal,
             nqp::elems($input),
             nqp::elems($output),
             nqp::time() - $then
           )
-        ) if nqp::istype($!result,ParaIterator);
+        ) if nqp::istype(nqp::getattr(self,Seq,'$!iter'),ParaIterator);
 
         # Make the produced values available to the result iterator
         nqp::push($semaphore,$output);
-    }
-
-    # Just count the number of produced values
-    method !count() {
-        my $iterator := self.iterator;
-        my uint $elems;
-        nqp::until(
-          nqp::eqaddr($iterator.pull-one, IE),
-          ++$elems
-        );
-        $elems
     }
 
 #- debugging -------------------------------------------------------------------
@@ -971,7 +974,14 @@ class ParaSeq does Sequence {
 
 #- where all the magic happens under the hood ----------------------------------
 
-    method iterator(ParaSeq:D:) { nqp::ifnull($!result,$!source) }
+    method iterator(ParaSeq:D:) {
+        nqp::ifnull(
+          nqp::getattr(self,Seq,'$!iter'),
+          $!source
+        )
+    }
+
+    method sink(ParaSeq:D: --> Nil) { self.iterator.sink-all }
 
 #- introspection ---------------------------------------------------------------
 
@@ -996,7 +1006,9 @@ class ParaSeq does Sequence {
     method racing(ParaSeq:D:) { nqp::hllbool($!racing) }
 
     method stats(ParaSeq:D:) {
-        nqp::isnull($!result) ?? () !! $!result.stats.List
+        nqp::isnull(nqp::getattr(self,Seq,'$!iter'))
+          ?? ()
+          !! nqp::getattr(self,Seq,'$!iter').stats.List
     }
 
     method processed(ParaSeq:D:) { self.stats.map(*.processed).sum }
@@ -1007,18 +1019,6 @@ class ParaSeq does Sequence {
     }
 
 #- endpoints -------------------------------------------------------------------
-
-    multi method elems(ParaSeq:D:) {
-        self.is-lazy
-          ?? self.fail-iterator-cannot-be-lazy('.elems',"")
-          !! self!count
-    }
-
-    multi method end(ParaSeq:D:) {
-        self.is-lazy
-          ?? self.fail-iterator-cannot-be-lazy('.end',"")
-          !! self!count - 1
-    }
 
     proto method first(|) {*}
     multi method first(ParaSeq:D:) { self.head }
@@ -1329,8 +1329,8 @@ class ParaSeq does Sequence {
                       $ordinal, $then, $input, $semaphore,
                       $mapper.run(
                         $ordinal == 0, $last,
-                        'grep', $input, $!result, $semaphore,
-                        $postprocess, |%nameds
+                        'grep', $input, nqp::getattr(self,Seq,'$!iter'),
+                        $semaphore, $postprocess, |%nameds
                       )
                     );
                 }
@@ -1569,7 +1569,8 @@ class ParaSeq does Sequence {
                   $ordinal, $then, $input, $semaphore,
                   $mapper.run(
                     $ordinal == 0, $last,
-                    $method, $input, $!result, $semaphore
+                    $method, $input, nqp::getattr(self,Seq,'$!iter'),
+                    $semaphore
                   )
                 );
             }
@@ -2100,7 +2101,6 @@ class ParaSeq does Sequence {
 
     multi method eager(ParaSeq:D:) { self.List      }
     multi method Hash(ParaSeq:D: ) { self.List.Hash }
-    multi method Int( ParaSeq:D: ) { self.elems     }
 
     multi method IterationBuffer(ParaSeq:D:) {
         self.iterator.push-all(my $buffer := nqp::create(IB));
@@ -2114,8 +2114,6 @@ class ParaSeq does Sequence {
     multi method Mix(    ParaSeq:D:) { self.List.Mix     }
     multi method MixHash(ParaSeq:D:) { self.List.MixHash }
 
-    method Numeric(ParaSeq:D:) { self.elems }
-
     multi method Seq(    ParaSeq:D:) { Seq.new: self.iterator    }
     multi method serial( ParaSeq:D:) { self.Seq                  }
     multi method Set(    ParaSeq:D:) { self.List.Set             }
@@ -2125,6 +2123,7 @@ class ParaSeq does Sequence {
     multi method Supply( ParaSeq:D:) { self.List.Supply          }
 
 #- hyper -----------------------------------------------------------------------
+
     proto method hyper(|) {*}
 
     # If the degree is 1, then just return the iterable, nothing to parallelize

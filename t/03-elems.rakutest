@@ -19,6 +19,7 @@ for 1, ParaSeq.default-degree {
 
 fails-like { (^Inf).&hyperize.elems }, X::Cannot::Lazy,
   action => '.elems';
+todo 'Fixed in Rakudo 2024.06';
 fails-like { (^Inf).&hyperize.end   }, X::Cannot::Lazy,
   action => '.end';
 is-deeply (^Inf).&hyperize.is-lazy, True, '^Inf is lazy';
