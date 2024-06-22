@@ -96,6 +96,13 @@ Flag.  Defaults to C<True>.  If specified with a C<False> value, then the
 batch size will B<not> be altered from the size (implicitely) specified
 with the second positional argument.
 
+=item :catch / :!catch
+
+Flag.  Defaults to C<True>.  If specified with a C<False> value, then any
+exception that is thrown by any of the parallel worker threads, will be
+re-thrown immediately, rather than being presented on STDERR at the end
+of the process.
+
 =head2 racify
 
 =begin code :lang<raku>
@@ -707,7 +714,7 @@ if the requirements for parallelizing have been met.
 
 Can be used in any situation where a C<Seq> could also be used.  The
 following additional methods can also be called for introspection and
-debugginng.  In alphabetical order:
+debugging.  In alphabetical order:
 
 =head3 auto
 
@@ -717,6 +724,11 @@ provide the best throughput.
 =head3 batch-sizes
 
 Range.  The smallest and largest batch size as a C<Range>.
+
+=head3 catch
+
+Bool.  Returns whether exceptions in parallel worker threads will be
+caught.
 
 =head3 default-batch
 
@@ -746,6 +758,16 @@ say ParaSeq.defaultdegreebatch;  # 3
 Int.  The default maximum number of worker threads to be used.  Currently
 set to the number of available CPUs minus one.  Can also be used to change
 the default maximum number of worker threads by assigning to it.
+
+=head3 exceptions
+
+Bag.  Returns a C<Bag> of exceptions that were caught in parallel processing
+B<so far>, keyed to the C<.gist> of the execution error (and the value being
+the number of times they occurred).
+
+By default, any caught exceptions will be printed on STDERR at the end of
+the process.  Calling this method effectively clears the caught exceptions,
+so that it can also be used to inhibit showing any execution errors.
 
 =head3 hyper
 

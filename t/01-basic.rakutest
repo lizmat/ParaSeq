@@ -1,10 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 24;
-
-ok &hyperize, 'was hyperize exported';
-ok &racify,   'was racify exported';
+plan 30;
 
 my constant $elems  = 200000;
 my constant $batch  = 16;
@@ -14,6 +11,9 @@ my constant %mapped = @list.map: $mapper;
 
 isa-ok @list.&hyperize, ParaSeq, 'did hyperize produce a ParaSeq';
 isa-ok @list.&racify,   ParaSeq, 'did racify produce a ParaSeq';
+
+ok &hyperize, 'was hyperize exported';
+ok &racify,   'was racify exported';
 
 for 1, ParaSeq.default-degree {
     is-deeply @list.&hyperize($batch, $_).Array, [@list],
@@ -36,6 +36,17 @@ for 1, ParaSeq.default-degree {
     is-deeply %m, %mapped,
       "did .map(mapper) produce ok with degree $_";
 }
+
+my $s := (^20).&hyperize.grep({ die "Bazinga" if .is-prime });
+is-deeply $s.auto,  True, 'is :auto reported ok';
+is-deeply $s.catch, True, 'is :catch reported ok';
+is-deeply $s.List, (), 'no values where produced';
+
+my $b := $s.exceptions;
+is $b.elems, 1, 'did we get 1 type of exception';
+
+ok $b.keys.head.starts-with("Bazinga"), 'did we get the right error message';
+is $b.values.head, 8, 'did we get the right amount';
 
 is ParaSeq.default-batch, 16,   "is the default batch size correct";
 ParaSeq.default-batch = 1024;

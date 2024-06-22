@@ -33,13 +33,39 @@ my constant IE = IterationEnd;
 my constant emptyIB   = nqp::create(IB);
 my constant emptyList = emptyIB.List;
 
+# A separator line
+my constant separator = "-" x 80;
+
 #- exception handling ----------------------------------------------------------
 
 my $exceptions := nqp::create(ParaQueue);
 
+# Create a Bag of the exceptions so far
+my sub bag-the-exceptions() {
+    my $buffer := nqp::create(IB);
+    nqp::while(
+      nqp::elems($exceptions),
+      nqp::push($buffer, nqp::shift($exceptions))
+    );
+    $buffer.List.map(*.gist.chomp).Bag
+}
+
+# Show the exceptions that weren't bagged before
 END {
-    if nqp::elems($exceptions) -> uint $elems {
-        say "Caught $elems exceptions:";
+    if nqp::elems($exceptions) -> uint $total {
+        my      $bagged := bag-the-exceptions;
+        my uint $elems   = $bagged.elems;
+        my str  $s       = $elems == 1 ?? "" !! "s";
+
+        my $ERR := $*ERR;
+        $ERR.say:
+          "Caught $elems unique exception$s (out of $total) in hypered code:";
+        for $bagged.sort(-*.value) {
+            $ERR.say: separator;
+            $ERR.print(.value ~ "x: ") if .value > 1;
+            $ERR.say: .key;
+        }
+        $ERR.say: separator;
     }
 }
 
@@ -716,6 +742,7 @@ class ParaSeq is Seq {
     has uint      $!racing;      # 1 = racing, 0 = hypering
     has uint      $!batch;       # initial batch size, must be > 0
     has uint      $!auto;        # 1 if batch size automatically adjusts
+    has uint      $!catch;       # 1 if exceptions should be caught
     has uint      $!degree;      # number of CPUs, must be > 1
 
 #- "last" handling -------------------------------------------------------------
@@ -738,7 +765,12 @@ class ParaSeq is Seq {
 #- private helper methods ------------------------------------------------------
 
     method !cue(&callable) {
-        $!SCHEDULER.cue: &callable;
+        $!catch
+          ?? $!SCHEDULER.cue: &callable, :catch({
+                 nqp::push($exceptions,$_);
+                 .resume
+             })
+          !! $!SCHEDULER.cue: &callable
     }
 
     # Set up object and return it
@@ -747,6 +779,7 @@ class ParaSeq is Seq {
       uint $racing,
       uint $batch,
       uint $auto,
+      uint $catch,
       uint $degree,
     ) is hidden-from-backtrace {
         my $self := nqp::create(self);
@@ -758,6 +791,7 @@ class ParaSeq is Seq {
         nqp::bindattr_i($self, ParaSeq, '$!racing', $racing);
         nqp::bindattr_i($self, ParaSeq, '$!batch',  $batch );
         nqp::bindattr_i($self, ParaSeq, '$!auto',   $auto  );
+        nqp::bindattr_i($self, ParaSeq, '$!catch',  $catch );
         nqp::bindattr_i($self, ParaSeq, '$!degree', $degree);
         $self
     }
@@ -1007,8 +1041,12 @@ class ParaSeq is Seq {
         self.stats.map(*.processed).minmax
     }
 
+    method catch(ParaSeq:D:) { nqp::hllbool($!catch) }
+
     method default-batch()  is raw { $default-batch  }
     method default-degree() is raw { $default-degree }
+
+    method exceptions() { bag-the-exceptions }
 
     multi method is-lazy(ParaSeq:D:) { $!source.is-lazy }
 
@@ -2127,7 +2165,7 @@ class ParaSeq is Seq {
     proto method hyper(|) {*}
 
     # If the degree is 1, then just return the iterable, nothing to parallelize
-    multi method hyper(ParaSeq: \iterable, $,$,$, 1) is implementation-detail {
+    multi method hyper(ParaSeq: \iterable,$,$,$,$, 1) is implementation-detail {
         iterable
     }
 
@@ -2137,6 +2175,7 @@ class ParaSeq is Seq {
       $racing,
       $batch  is copy,
       $auto   is copy,
+      $catch  is copy,
       $degree is copy,
     ) is implementation-detail {
         $batch := ($batch // $default-batch).Int;
@@ -2160,16 +2199,19 @@ class ParaSeq is Seq {
 
         # Need to actually parallelize, set up ParaSeq object
         else {
-            $auto       := ($auto // True).Bool;
+            $auto  := ($auto  // True).Bool;
+            $catch := ($catch // True).Bool;
             self!setup(
               BufferIterator.new($buffer, $iterator),
-              $racing, $batch, $auto, $degree
+              $racing, $batch, $auto, $catch, $degree
             )
         }
     }
 
     # Change hypering settings along the way
-    multi method hyper(ParaSeq:D: $batch?, $degree?, :$auto, :$racing) {
+    multi method hyper(ParaSeq:D:
+      $batch?, $degree?, :$auto, :$catch, :$racing
+    ) {
         $degree && $degree == 1
           ?? self.serial     # re-hypering with degree == 1 -> serialize
           !! ParaSeq.hyper(  # restart, taking over defaults
@@ -2177,6 +2219,7 @@ class ParaSeq is Seq {
                $racing // $!racing,
                $batch  // $!batch,
                $auto   // $!auto,
+               $catch  // $!catch,
                $degree // $!degree
              )
     }
@@ -2185,24 +2228,24 @@ class ParaSeq is Seq {
 #- actual interface ------------------------------------------------------------
 
 proto sub hyperize(|) is export {*}
-multi sub hyperize(\iterable, $batch?, $degree?, :$auto) {
-    ParaSeq.hyper(iterable, 0, $batch, $auto, $degree)
+multi sub hyperize(\iterable, $batch?, $degree?, :$auto, :$catch) {
+    ParaSeq.hyper(iterable, 0, $batch, $auto, $catch, $degree)
 }
-multi sub hyperize(List:D $list, $size?, $degree?, :$auto) {
+multi sub hyperize(List:D $list, $size?, $degree?, :$auto, :$catch) {
     my uint $batch = $size // $default-batch;
     $list.is-lazy || $list.elems > $batch
-      ?? ParaSeq.hyper($list, 0, $batch, $auto, $degree)
+      ?? ParaSeq.hyper($list, 0, $batch, $auto, $catch, $degree)
       !! $list
 }
 
 proto sub racify(|) is export {*}
-multi sub racify(\iterable, $batch?, $degree?, :$auto) {
-    ParaSeq.hyper(iterable, 1, $batch, $auto, $degree)
+multi sub racify(\iterable, $batch?, $degree?, :$auto, :$catch) {
+    ParaSeq.hyper(iterable, 1, $batch, $auto, $catch, $degree)
 }
-multi sub racify(List:D $list, $size?, $degree?, :$auto) {
+multi sub racify(List:D $list, $size?, $degree?, :$auto, :$catch) {
     my uint $batch = $size // $default-batch;
     $list.is-lazy || $list.elems > $batch
-      ?? ParaSeq.hyper($list, 1, $batch, $auto, $degree)
+      ?? ParaSeq.hyper($list, 1, $batch, $auto, $catch, $degree)
       !! $list
 }
 

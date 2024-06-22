@@ -77,6 +77,10 @@ The third positional argument indicates the maximum number of worker threads tha
 
 Flag. Defaults to `True`. If specified with a `False` value, then the batch size will **not** be altered from the size (implicitely) specified with the second positional argument.
 
+  * :catch / :!catch
+
+Flag. Defaults to `True`. If specified with a `False` value, then any exception that is thrown by any of the parallel worker threads, will be re-thrown immediately, rather than being presented on STDERR at the end of the process.
+
 racify
 ------
 
@@ -518,7 +522,7 @@ ParaSeq
 
 The class of which an instance is returned by `hyperize` and `racify` if the requirements for parallelizing have been met.
 
-Can be used in any situation where a `Seq` could also be used. The following additional methods can also be called for introspection and debugginng. In alphabetical order:
+Can be used in any situation where a `Seq` could also be used. The following additional methods can also be called for introspection and debugging. In alphabetical order:
 
 ### auto
 
@@ -527,6 +531,10 @@ Bool. Returns whether batch sizes will be automatically optimized to provide the
 ### batch-sizes
 
 Range. The smallest and largest batch size as a `Range`.
+
+### catch
+
+Bool. Returns whether exceptions in parallel worker threads will be caught.
 
 ### default-batch
 
@@ -549,6 +557,12 @@ say ParaSeq.defaultdegreebatch;  # 3
 ```
 
 Int. The default maximum number of worker threads to be used. Currently set to the number of available CPUs minus one. Can also be used to change the default maximum number of worker threads by assigning to it.
+
+### exceptions
+
+Bag. Returns a `Bag` of exceptions that were caught in parallel processing **so far**, keyed to the `.gist` of the execution error (and the value being the number of times they occurred).
+
+By default, any caught exceptions will be printed on STDERR at the end of the process. Calling this method effectively clears the caught exceptions, so that it can also be used to inhibit showing any execution errors.
 
 ### hyper
 

@@ -8,6 +8,12 @@ Revision history for ParaSeq
     - Added ParaIterator.sink-all for those hypering cases where only
       the side-effects are interesting
     - Added ParaSeq.sink to keep proper sinking semantics
+    - Added logic to catch and keep any exceptions occurring during
+      parallel execution, and display them at END time.
+    - Added :catch named argument to &hyperize/&racify/.hyper to indicate
+      whether any exceptions should be caught.  Defaults to True
+    - Added .exceptions method that will return a Bag of exceptions that
+      were caught so far
     - Removed some dead code
 
 0.2.3  2024-06-20T19:44:33+02:00
