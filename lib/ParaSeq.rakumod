@@ -3,13 +3,20 @@
 use v6.*;
 use nqp;
 
+#- ParaQueue -------------------------------------------------------------------
+# A blocking concurrent queue to which one can nqp::push and from which one
+# can nqp::shift
+my class ParaQueue is repr('ConcBlockingQueue') { }
+
+#- globals ---------------------------------------------------------------------
+
 my uint $default-batch  = 16;
 my uint $default-degree = Kernel.cpu-cores-but-one;
 my uint $target-nsecs   = 1_000_000;  # .001 second
 my uint $target-nsecs2  = nqp::mul_i($target-nsecs,2);
 
 # Helper sub to determine granularity of batches depending on the signature
-# of a callable
+# of a Callable
 my sub granularity(&callable) {
     my $count := &callable.count;
     $count == Inf ?? 1 !! $count
@@ -25,6 +32,16 @@ my constant IE = IterationEnd;
 # An empty IterationBuffer, for various places where it is needed as a source
 my constant emptyIB   = nqp::create(IB);
 my constant emptyList = emptyIB.List;
+
+#- exception handling ----------------------------------------------------------
+
+my $exceptions := nqp::create(ParaQueue);
+
+END {
+    if nqp::elems($exceptions) -> uint $elems {
+        say "Caught $elems exceptions:";
+    }
+}
 
 #- BlockMapper -----------------------------------------------------------------
 
@@ -164,11 +181,6 @@ my role BlockMapper {
     multi method has-phaser("FIRST" --> False) { }
     multi method has-phaser(Str:D) { nextsame }
 }
-
-#- ParaQueue -------------------------------------------------------------------
-# A blocking concurrent queue to which one can nqp::push and from which one
-# can nqp::shift
-my class ParaQueue is repr('ConcBlockingQueue') { }
 
 #- BufferIterator --------------------------------------------------------------
 # An iterator that takes a buffer and an iterator, and first produces all
@@ -725,6 +737,10 @@ class ParaSeq is Seq {
 
 #- private helper methods ------------------------------------------------------
 
+    method !cue(&callable) {
+        $!SCHEDULER.cue: &callable;
+    }
+
     # Set up object and return it
     method !setup(
            $source,
@@ -907,7 +923,7 @@ class ParaSeq is Seq {
 
         # Make sure the scheduling of further batches actually happen in a
         # separate thread, whether they'd be slow or fast
-        $!SCHEDULER.cue: $slow ?? &slow !! &fast;
+        self!cue: $slow ?? &slow !! &fast;
 
         # All scheduled now, so let the show begin!
         self
@@ -1044,9 +1060,8 @@ class ParaSeq is Seq {
         self.fail-iterator-cannot-be-lazy('.join') if self.is-lazy;
 
         # Logic for joining a buffer
-        my $SCHEDULER := $!SCHEDULER;
         sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then = nqp::time;
 
                 nqp::push(
@@ -1067,9 +1082,8 @@ class ParaSeq is Seq {
         self.fail-iterator-cannot-be-lazy('.minmax') if self.is-lazy;
 
         # Logic for joining a buffer
-        my $SCHEDULER := $!SCHEDULER;
         sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then = nqp::time;
 
                 my $min := my $max := nqp::atpos($input,0);
@@ -1130,9 +1144,8 @@ class ParaSeq is Seq {
     multi method reduce(ParaSeq:D: Callable:D $reducer) {
 
         # Logic for reducing a buffer
-        my $SCHEDULER := $!SCHEDULER;
         sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then = nqp::time;
 
                 self!batch-done(
@@ -1152,9 +1165,8 @@ class ParaSeq is Seq {
         self.fail-iterator-cannot-be-lazy('.sum') if self.is-lazy;
 
         # Logic for summing a buffer
-        my $SCHEDULER := $!SCHEDULER;
         sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then = nqp::time;
 
                 nqp::push((my $output := nqp::create(IB)),$input.List.sum);
@@ -1173,7 +1185,6 @@ class ParaSeq is Seq {
 #-- antipairs ------------------------------------------------------------------
 
     multi method antipairs(ParaSeq:D:) {
-        my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset
 
         # Logic for queuing a buffer for .antipairs
@@ -1182,7 +1193,7 @@ class ParaSeq is Seq {
             my uint $elems  = nqp::elems($input);
             $base = $base + $elems;
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1209,9 +1220,8 @@ class ParaSeq is Seq {
     method !batch(uint $size, uint $partial) {
 
         # Logic for queuing a buffer for batches
-        my $SCHEDULER := $!SCHEDULER;
         sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1286,7 +1296,6 @@ class ParaSeq is Seq {
 
         # Need to have postprocessing
         if $k || $kv || $p { 
-            my      $SCHEDULER  := $!SCHEDULER;
             my uint $granularity = granularity($matcher);
             my uint $base;  # base offset to be added for each batch
 
@@ -1322,7 +1331,7 @@ class ParaSeq is Seq {
                        }
 
                 # Cue the actual work
-                $SCHEDULER.cue: {
+                self!cue: {
                     my uint $then = nqp::time;
 
                     self!batch-done(
@@ -1348,12 +1357,11 @@ class ParaSeq is Seq {
 
     # Handling other Callables that cannot have phasers
     multi method grep(ParaSeq:D: Callable:D $matcher, :$k, :$kv, :$p) {
-        my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset for :k, :kv, :p
 
         # Logic for queuing a buffer for bare grep { }, producing values
         sub v(uint $ordinal, uint $last, $input is raw, $semaphore is raw) {
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1368,7 +1376,7 @@ class ParaSeq is Seq {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1386,7 +1394,7 @@ class ParaSeq is Seq {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1407,7 +1415,7 @@ class ParaSeq is Seq {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1433,12 +1441,11 @@ class ParaSeq is Seq {
 
     # Handling smart-matching logic
     multi method grep(ParaSeq:D: $matcher, :$k, :$kv, :$p) {
-        my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset for :k, :kv, :p
 
         # Logic for queuing a buffer for grep /.../
         sub v(uint $ordinal, $input is raw, $semaphore is raw) {
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1453,7 +1460,7 @@ class ParaSeq is Seq {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1471,7 +1478,7 @@ class ParaSeq is Seq {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1492,7 +1499,7 @@ class ParaSeq is Seq {
             my uint $offset = $base;
             $base = $base + nqp::elems($input);
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1515,7 +1522,6 @@ class ParaSeq is Seq {
 #- kv --------------------------------------------------------------------------
 
     multi method kv(ParaSeq:D:) {
-        my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset
 
         # Logic for queuing a buffer for .keys
@@ -1524,7 +1530,7 @@ class ParaSeq is Seq {
             my uint $elems  = nqp::elems($input);
             $base = $base + $elems;
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1550,7 +1556,6 @@ class ParaSeq is Seq {
 
     # Handling Callables that can have phasers
     method !mapBlock($Mapper, $method) {
-        my      $SCHEDULER  := $!SCHEDULER;
         my uint $granularity = granularity($Mapper);
 
         my $mapper := (nqp::clone($Mapper) but BlockMapper)
@@ -1562,7 +1567,7 @@ class ParaSeq is Seq {
                $input     is raw,
                $semaphore is raw,
         ) {
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then = nqp::time;
 
                 self!batch-done(
@@ -1582,10 +1587,9 @@ class ParaSeq is Seq {
 
     # Handling Callables that cannot have phasers
     method !mapCallable($mapper, str $method) {
-        my $SCHEDULER  := $!SCHEDULER;
 
         sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
-            $SCHEDULER.cue: {
+            self!cue: {
                  my uint $then    = nqp::time;
 
                 $input.List."$method"($mapper).iterator.push-all(
@@ -1626,13 +1630,12 @@ class ParaSeq is Seq {
         my uint $base;
 
         # Always produce .kv internally for convenience
-        my $SCHEDULER := $!SCHEDULER;
         sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
             my uint $offset = $base;
             my uint $elems  = nqp::elems($input);
             $base = $base + $elems;
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1760,7 +1763,6 @@ class ParaSeq is Seq {
 #- pairs -----------------------------------------------------------------------
 
     multi method pairs(ParaSeq:D:) {
-        my $SCHEDULER := $!SCHEDULER;
         my uint $base;  # base offset
 
         # Logic for queuing a buffer for .pairs
@@ -1769,7 +1771,7 @@ class ParaSeq is Seq {
             my uint $elems  = nqp::elems($input);
             $base = $base + $elems;
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then    = nqp::time;
                 my      $output := nqp::create(IB);
 
@@ -1807,10 +1809,9 @@ class ParaSeq is Seq {
 
         # Either a non-standard "as" or "with", hypering then *does make sense
         else {
-            my $SCHEDULER := $!SCHEDULER;
 
             sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
-                $SCHEDULER.cue: {
+                self!cue: {
                     my uint $then = nqp::time;
 
                     $input.Seq.squish(:&as, :&with).iterator.push-all(
@@ -1845,14 +1846,13 @@ class ParaSeq is Seq {
     multi method unique(ParaSeq:D: :with(&op)!, :&as = &identity) {
         return self.unique(:&as) if nqp::eqaddr(&op,&[===]);
 
-        my $SCHEDULER := $!SCHEDULER;
         my $hashes    := nqp::create(IB);  # list of hashes, keyed on threadid
         my $lock      := Lock.new;
 
         # Logic for queuing a buffer for unique WITH an infix op
         sub processor(uint $ordinal, $input is raw, $semaphore is raw) {
 
-            $SCHEDULER.cue: {
+            self!cue: {
                 my uint $then = nqp::time;
                 my      $output := nqp::create(IB);
 
