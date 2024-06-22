@@ -1,6 +1,8 @@
 Revision history for ParaSeq
 
 {{$NEXT}}
+
+0.2.4  2024-06-22T16:33:08+02:00
     - Make ParaSeq a subclass of Seq, rather than a consumer of the
       Sequence role.  This makes ParaSeq an Iterable, so easier to
       use in the same way as a Seq.  As a result, some code could
