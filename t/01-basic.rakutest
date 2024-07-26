@@ -1,7 +1,7 @@
 use Test;
 use ParaSeq;
 
-plan 30;
+plan 31;
 
 my constant $elems  = 200000;
 my constant $batch  = 16;
@@ -56,5 +56,10 @@ is ParaSeq.default-degree, Kernel.cpu-cores-but-one,
   "is the default degree correct";
 ParaSeq.default-degree = 3;
 is ParaSeq.default-degree, 3, "is the updated default degree correct";
+
+my atomicint $seen;
+my $*FOO = "foo";
+(^10).&hyperize(1).map: { ++⚛$seen if $*FOO eq 'foo' }
+is $seen, 10, 'was the dynamic variable seen all times';
 
 # vim: expandtab shiftwidth=4

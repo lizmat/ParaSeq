@@ -765,12 +765,37 @@ class ParaSeq is Seq {
 #- private helper methods ------------------------------------------------------
 
     method !cue(&callable) {
+        my $promise;
+
+        # Already living inside an async environment, so use this Promise
+        # with its dynamic context
+        with $*PROMISE {
+            $promise := $_;
+        }
+
+        # First time we do an async call: create a promise that can be
+        # living inside the async code's scope, to allow access to the
+        # dynamic variables living in *this* dynamic context
+        else {
+            $promise := Promise.new(:scheduler($!SCHEDULER));
+            nqp::bindattr($promise,Promise,'$!dynamic_context',nqp::ctx);
+        }
+
+        # Set up code to be actually queued, which adds a $*PROMISE to its
+        # dynamic scope, so that references to dynamic variables will refer
+        # to dynamic variables of the original scope
+        my &code := {
+            my $*PROMISE := $promise;
+            callable()
+        }
+
+        # Perform the actual cueing
         $!catch
-          ?? $!SCHEDULER.cue: &callable, :catch({
+          ?? $!SCHEDULER.cue: &code, :catch({
                  nqp::push($exceptions,$_);
                  .resume
              })
-          !! $!SCHEDULER.cue: &callable
+          !! $!SCHEDULER.cue: &code
     }
 
     # Set up object and return it
