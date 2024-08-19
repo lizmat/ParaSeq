@@ -2,6 +2,11 @@ Revision history for ParaSeq
 
 {{$NEXT}}
 
+0.2.6  2024-08-19T21:28:27+02:00
+    - Make sure we don't crash on trying to resume an unresumable
+      exception.  This hopefully will help finding some race conditions
+      in clients such as "rak"
+
 0.2.5  2024-07-26T23:58:45+02:00
     - Make sure that dynamic variables in the current scope are visible
       by the code that is being hyperized or racified.

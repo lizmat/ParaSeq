@@ -793,7 +793,7 @@ class ParaSeq is Seq {
         $!catch
           ?? $!SCHEDULER.cue: &code, :catch({
                  nqp::push($exceptions,$_);
-                 .resume
+                 try .resume;
              })
           !! $!SCHEDULER.cue: &code
     }
