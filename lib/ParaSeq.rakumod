@@ -791,11 +791,11 @@ class ParaSeq is Seq {
 
         # Perform the actual cueing
         $!catch
-          ?? $!SCHEDULER.cue: &code, :catch({
+          ?? $!SCHEDULER.cue: &code.clone, :catch({
                  nqp::push($exceptions,$_);
                  try .resume;
              })
-          !! $!SCHEDULER.cue: &code
+          !! $!SCHEDULER.cue: &code.clone
     }
 
     # Set up object and return it

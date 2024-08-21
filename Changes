@@ -2,6 +2,10 @@ Revision history for ParaSeq
 
 {{$NEXT}}
 
+0.2.7  2024-08-21T15:20:25+02:00
+    - Make sure the block that is being cued is cloned: this is what
+      appears to be done by start { }, so it's probably good practice
+
 0.2.6  2024-08-19T21:28:27+02:00
     - Make sure we don't crash on trying to resume an unresumable
       exception.  This hopefully will help finding some race conditions
