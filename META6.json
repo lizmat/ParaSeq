@@ -6,6 +6,7 @@
   "build-depends": [
   ],
   "depends": [
+    "Log::Timeline:ver<0.5.1>:auth<zef:jnthn>"
   ],
   "description": "Parallel execution of Iterables",
   "license": "Artistic-2.0",
