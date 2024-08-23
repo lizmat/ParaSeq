@@ -1,4 +1,4 @@
-[![Actions Status](https://github.com/lizmat/ParaSeq/actions/workflows/linux.yml/badge.svg)](https://github.com/lizmat/ParaSeq/actions) [![Actions Status](https://github.com/lizmat/ParaSeq/actions/workflows/macos.yml/badge.svg)](https://github.com/lizmat/ParaSeq/actions) [![Actions Status](https://github.com/lizmat/ParaSeq/actions/workflows/windows.yml/badge.svg)](https://github.com/lizmat/ParaSeq/actions)
+[![Actions Status](https://github.com/lizmat/ParaSeq/actions/workflows/linux.yml/badge.svg)](https://github.com/lizmat/ParaSeq/actions) [![Actions Status](https://github.com/lizmat/ParaSeq/actions/workflows/macos.yml/badge.svg)](https://github.com/lizmat/ParaSeq/actions)
 
 NAME
 ====
