@@ -619,49 +619,39 @@ my class ParaIterator does Iterator {
 
     # Optimized version appending to an IterationBuffer
     multi method push-all(ParaIterator:D: IterationBuffer:D \target) {
-        my $current  := $!current;
+        my $current := $!current;
 
-        nqp::while(
-          1,
-          nqp::stmts(
-            nqp::splice(target,$current,nqp::elems(target),0),
-            nqp::if(
-              nqp::eqaddr((my $next := self!next),IE),
-              (return IE),
-              ($current := self!next-batch($next))
-            )
-          )
-        );
+        loop {
+            nqp::splice(target,$current,nqp::elems(target),0);
+            nqp::eqaddr((my $next := self!next),IE)
+              ?? (return IE)
+              !! ($current := self!next-batch($next));
+        }
     }
 
     # Slower generic version that needs to coerce each buffer to a List
     # to ensure the correct semantics with .append
-    multi method push-all(ParaIterator:D: \target) {
-        my $current  := $!current;
+    multi method push-all(ParaIterator:D: Any:D \target) {
+        my $current := $!current;
 
-        nqp::while(
-          1,
-          nqp::stmts(
-            target.append($current.List),
-            nqp::if(
-              nqp::eqaddr((my $next := self!next),IE),
-              (return IE),
-              ($current := self!next-batch($next))
-            )
-          )
-        );
+        loop {
+            nqp::while(
+              nqp::elems($current),
+              target.push(nqp::shift($current))
+            );
+            nqp::eqaddr((my $next := self!next),IE)
+              ?? (return IE)
+              !! ($current := self!next-batch($next));
+        }
     }
 
     # Optimized version used for its side-effects
     method sink-all(ParaIterator:D:) {
-        nqp::while(
-          1,
-          nqp::if(
-            nqp::eqaddr((my $next := self!next),IE),
-            (return IE),
-            self!next-batch($next)
-          )
-        );
+        loop {
+            nqp::eqaddr((my $next := self!next),IE)
+              ?? (return IE)
+              !! self!next-batch($next);
+        }
     }
 
     method close-queues(ParaIterator:D:) is implementation-detail {
@@ -791,11 +781,11 @@ class ParaSeq is Seq {
 
         # Perform the actual cueing
         $!catch
-          ?? $!SCHEDULER.cue: &code.clone, :catch({
+          ?? $!SCHEDULER.cue: nqp::p6capturelex(&code.clone), :catch({
                  nqp::push($exceptions,$_);
                  try .resume;
              })
-          !! $!SCHEDULER.cue: &code.clone
+          !! $!SCHEDULER.cue: nqp::p6capturelex(&code.clone)
     }
 
     # Set up object and return it
@@ -882,7 +872,6 @@ class ParaSeq is Seq {
 
             my uint $ordinal;    # ordinal number of batch
             my uint $exhausted;  # flag: 1 if exhausted
-
 
             # Queue the first buffer we already filled, and set up the
             # result iterator

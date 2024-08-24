@@ -1,0 +1,22 @@
+use Test;
+use ParaSeq;
+
+plan 4;
+
+my constant multiplier = 10000;
+my $code  = $*PROGRAM.slurp x multiplier;
+my @codes = $code xx 100;
+my atomicint $seen;
+my atomicint $started;
+
+my @a = @codes.&hyperize.map({
+    ++⚛$started;
+    .lines.&hyperize.map({ ++⚛$seen, $_ if .contains("clean")}).elems
+});
+
+is-deeply $started, +@codes, 'did we start all parts';
+is-deeply @a.elems, +@codes, 'did we get all parts';
+is-deeply $seen, multiplier * @codes, 'did we see all occurrences';
+is-deeply @a.sum, multiplier * @codes, 'did we get all occurrences';
+
+# vim: expandtab shiftwidth=4
