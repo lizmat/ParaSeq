@@ -692,6 +692,28 @@ Called on the last iteration in the last batch. Note that this can be short-circ
 
 Called after each iteration.
 
+CAVEATS
+=======
+
+Regular expressions
+-------------------
+
+One of the great features of the Raku Programming Language, is the handling of regexes (aka regular expressions). However, in a multi-threaded environment, one of its features: the [`$/`](https://docs.raku.org/language/variables#The_$/_variable) is a potential source of problems. That is because if a block of code doesn't define its own `$/` variable, the nearest **lexically scoped $/** will be used.
+
+For example:
+
+```raku
+say @words.&hyperize.grep({ / foo / }).elems;
+```
+
+has a great chance of not producing the correct results, especially for larger number of elements in `@words`. That's because all of the threads running the code inside the `.grep` will share the nearest lexically visible `$/`. In Rakudo releases before 2024.08, it could even cause crashes. Since then, it will only produce potentially incorrect results.
+
+The fix is pretty easy: make sure a `my $/;` is defined inside the scope of the block. Taking the above example:
+
+```raku
+say @words.&hyperize.grep({ my $/; / foo / }).elems;
+```
+
 THEORY OF OPERATION
 ===================
 

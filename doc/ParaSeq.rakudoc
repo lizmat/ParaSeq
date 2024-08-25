@@ -935,6 +935,41 @@ short-circuited with a C<last> control statement.
 
 Called after each iteration.
 
+=head1 CAVEATS
+
+=head2 Regular expressions
+
+One of the great features of the Raku Programming Language, is the handling
+of regexes (aka regular expressions).  However, in a multi-threaded
+environment, one of its features: the
+L<C<$/>|https://docs.raku.org/language/variables#The_$/_variable> is a
+potential source of problems.  That is because if a block of code doesn't
+define its own C<$/> variable, the nearest B<lexically scoped $/> will be
+used.
+
+For example:
+
+=begin code :lang<raku>
+
+say @words.&hyperize.grep({ / foo / }).elems;
+
+=end code
+
+has a great chance of not producing the correct results, especially for
+larger number of elements in C<@words>.  That's because all of the threads
+running the code inside the C<.grep> will share the nearest lexically
+visible C<$/>.  In Rakudo releases before 2024.08, it could even cause
+crashes.  Since then, it will only produce potentially incorrect results.
+
+The fix is pretty easy: make sure a C<my $/;> is defined inside the scope
+of the block.  Taking the above example:
+
+=begin code :lang<raku>
+
+say @words.&hyperize.grep({ my $/; / foo / }).elems;
+
+=end code
+
 =head1 THEORY OF OPERATION
 
 A description of the program logic when you call C<.&hyperize> on an
