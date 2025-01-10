@@ -51,8 +51,12 @@ sub test-dir($dir) {
 }
 
 test-dir("t");
+test-dir($_) for dir("t", :test({ !.starts-with(".") && "t/$_".IO.d})).map(*.Str).sort;
 test-dir("xt") if $author && "xt".IO.e;
-install if $install;
+if $install {
+    install;
+    ++$done;
+}
 
 if @failed {
     say "\nFAILED: {+@failed} of $done:";
